@@ -11,7 +11,9 @@ check_api.py - 验证项目根目录下的 `.env` 中 API_KEY 与 BASE_URL 是�
 
 import os
 import sys
+import time
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 
 try:
     from openai import OpenAI
@@ -35,71 +37,72 @@ def main():
 
     try:
         client = OpenAI(api_key=api_key, base_url=base_url)
+
+        # 1. 验证 models.list()
         resp = client.models.list()
-        models = []
-        # 兼容不同 SDK 返回格式
         if hasattr(resp, "data"):
             models = resp.data
         elif isinstance(resp, list):
             models = resp
         else:
-            # 尝试从 dict 中提取
-            try:
-                models = resp.get("data", [])
-            except Exception:
-                models = []
+            models = resp.get("data", [])
 
-        print(f"✅ API 可访问。返回了 {len(models)} 个模型（若返回为0也可能表明权限/模型不可见）。")
+        print(f"✅ API 可访问。返回了 {len(models)} 个模型（0 也可能表示无可见模型）。")
 
-        # 列举所有模型
-        print('\n-- 模型列表 --')
+        print("\n-- 模型列表 --")
         model_ids = []
         for i, m in enumerate(models, 1):
             mid = getattr(m, "id", None) or (m.get("id") if isinstance(m, dict) else str(m))
             model_ids.append(mid)
             print(f"  {i}. {mid}")
 
-        # 选择用于测试的模型（优先使用 TEST_MODEL 环境变量）
-        test_model = os.getenv('TEST_MODEL') or (model_ids[0] if model_ids else None)
+        test_model = os.getenv("TEST_MODEL")
         if not test_model:
-            print("❌ 未找到用于测试的模型。")
+            print("❌ 未找到 TEST_MODEL 环境变量，跳过推理测试。")
             sys.exit(0)
 
-        print(f"\n尝试对模型 '{test_model}' 发送一次简单请求以验证推理能力。")
+        print(f"\n尝试对模型 '{test_model}' 发送一次普通 ChatCompletion 请求（不启用 thinking）。")
+
+        # 2. 普通 Chat Completion（非流式、不启用 thinking）
+        messages = [
+            {"role": "system", "content": "You are a helpful test assistant."},
+            {"role": "user", "content": "介绍一下你自己"}
+        ]
+
+        print("DEBUG: 发送 chat completion 请求...")
+        completion = client.chat.completions.create(
+            model=test_model,
+            messages=messages,
+            temperature=0,
+            max_tokens=256,
+            # 关键：通过 extra_body 下发给“兼容 OpenAI 的第三方服务端”
+            extra_body={
+                "enable_thinking": False,  # 关键：强制不要推理输出（适配你这个服务端）
+            },
+        )  # type: ignore
+
+
+        print("DEBUG: 收到响应，解析中...")
+        time.sleep(1)
 
         try:
-            # 简单的 Chat 完成调用（同步）
-            messages = [
-                {"role": "system", "content": "You are a helpful test assistant."},
-                {"role": "user", "content": "你是谁？"}
-            ]
-            print('DEBUG: 发送 chat completion 请求...')
-            completion = client.chat.completions.create(
-                model=test_model,
-                messages=messages,
-                temperature=0,
-                max_tokens=32
-            )
+            content = completion.choices[0].message.content
+        except Exception:
+            content = str(completion)
 
-            # 尝试解析响应
-            try:
-                content = completion.choices[0].message.content
-            except Exception:
-                # 兼容不同响应格式
-                content = str(completion)
+        print("DEBUG finish_reason:", completion.choices[0].finish_reason)
+        print("DEBUG message:", completion.choices[0].message)
 
-            print("\n-- 推理响应 --")
-            print(content)
-            sys.exit(0)
 
-        except Exception as e:
-            import traceback
-            print("❌ 推理请求失败:", str(e))
-            traceback.print_exc()
-            sys.exit(1)
+        print("\n-- 模型响应 --")
+        print(content)
+
+        sys.exit(0)
 
     except Exception as e:
+        import traceback
         print("❌ 调用 API 失败:", str(e))
+        traceback.print_exc()
         sys.exit(1)
 
 
