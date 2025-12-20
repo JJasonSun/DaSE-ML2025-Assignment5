@@ -4,18 +4,18 @@ from typing import Dict, List, Optional
 
 class ModelProvider(ABC):
     """
-    Abstract base class for agent implementations.
+    Agent 实现的抽象基类。
 
-    Implement this class to create your own agent system for the needle-in-haystack tests.
+    继承本类以实现属于自己的大海捞针测试 Agent。
     """
 
     def __init__(self, api_key: str, base_url: str):
         """
-        Initialize the model provider.
+        初始化模型提供者。
 
         Args:
-            api_key: API key for the LLM service
-            base_url: Base URL for the LLM service
+            api_key: LLM 服务的 API Key
+            base_url: LLM 服务的基础地址
         """
         self.api_key = api_key
         self.base_url = base_url
@@ -24,54 +24,54 @@ class ModelProvider(ABC):
     @abstractmethod
     async def evaluate_model(self, prompt: Dict) -> str:
         """
-        Evaluate the model with the given prompt.
+        根据给定 prompt 调用模型。
 
-        This is where you implement your agent system logic.
+        需要在这里实现 Agent 的核心推理逻辑。
 
         Args:
-            prompt: Dictionary containing all necessary information
+            prompt: 包含上下文与问题等信息的字典
 
         Returns:
-            The model's response
+            模型返回的答案
         """
         ...
 
     @abstractmethod
     def generate_prompt(self, **kwargs) -> Dict:
         """
-        Generate the prompt structure for the model.
+        生成传入模型的 prompt 结构。
 
         Args:
-            **kwargs: Flexible parameters depending on the test scenario
+            **kwargs: 依据测试场景传入的灵活参数
 
         Returns:
-            Dictionary containing all prompt information
+            包含 prompt 信息的字典
         """
         ...
 
     @abstractmethod
     def encode_text_to_tokens(self, text: str) -> List[int]:
         """
-        Encode text to token IDs.
+        将文本编码为 tokens。
 
         Args:
-            text: Text to encode
+            text: 需要编码的文本
 
         Returns:
-            List of token IDs
+            token ID 列表
         """
         ...
 
     @abstractmethod
     def decode_tokens(self, tokens: List[int], context_length: Optional[int] = None) -> str:
         """
-        Decode token IDs to text.
+        将 token ID 解码回文本。
 
         Args:
-            tokens: List of token IDs
-            context_length: Optional number of tokens to decode
+            tokens: token ID 列表
+            context_length: 可选，限定解码长度
 
         Returns:
-            Decoded text
+            解码后的文本
         """
         ...

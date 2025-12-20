@@ -15,8 +15,7 @@ from datetime import datetime, timezone
 
 class LLMSingleNeedleHaystackTester:
     """
-    Test framework for evaluating LLM's ability to retrieve specific information
-    (needle) from a large context (haystack).
+    用于评估大模型在长上下文中检索特定信息（needle）能力的测试框架。
     """
 
     def __init__(self,
@@ -98,23 +97,23 @@ class LLMSingleNeedleHaystackTester:
         self.evaluator = evaluator
 
     def logistic(self, x, L=100, x0=50, k=.1):
-        """Apply logistic function for sigmoid distribution."""
+        """对输入应用逻辑函数，构造类似 Sigmoid 的分布。"""
         if x in [0, 100]:
             return x
         x = -k * (x - x0)
         return np.round(L * self.sigmoid(x), 3)
 
     def sigmoid(self, x):
-        """Sigmoid function."""
+        """标准 Sigmoid 函数。"""
         return 1 / (1 + np.exp(-x))
 
     async def bound_evaluate_and_log(self, sem, *args):
-        """Execute evaluate_and_log with semaphore control."""
+        """使用信号量控制并发地执行 evaluate_and_log。"""
         async with sem:
             await self.evaluate_and_log(*args)
 
     async def run_test(self):
-        """Run all test combinations of context lengths and depths."""
+        """运行所有上下文长度与深度组合的测试。"""
         sem = Semaphore(self.num_concurrent_requests)
 
         tasks = []
@@ -127,7 +126,7 @@ class LLMSingleNeedleHaystackTester:
 
     async def evaluate_and_log(self, context_length, depth_percent):
         """
-        Evaluate model at specific context length and depth, then log results.
+        在指定的上下文长度与深度下评估模型并记录结果。
         """
         if self.save_results:
             if self.result_exists(context_length, depth_percent):
@@ -193,7 +192,7 @@ class LLMSingleNeedleHaystackTester:
             await asyncio.sleep(self.seconds_to_sleep_between_completions)
 
     def result_exists(self, context_length, depth_percent):
-        """Check if result already exists for given parameters."""
+        """检查指定参数的结果文件是否已经存在。"""
         results_dir = 'results/'
         if not os.path.exists(results_dir):
             return False
@@ -211,14 +210,14 @@ class LLMSingleNeedleHaystackTester:
         return False
 
     async def generate_context(self, context_length, depth_percent):
-        """Generate context with needle inserted at specified depth."""
+        """生成插入 needle 且达到目标深度的上下文。"""
         context = self.read_context_files()
         context = self.encode_and_trim(context, context_length)
         context = self.insert_needle(context, depth_percent, context_length)
         return context
 
     def insert_needle(self, context, depth_percent, context_length):
-        """Insert needle into context at specified depth percentage."""
+        """按照深度百分比将 needle 插入上下文。"""
         tokens_needle = self.model_to_test.encode_text_to_tokens(self.needle)
         tokens_context = self.model_to_test.encode_text_to_tokens(context)
 
@@ -244,11 +243,11 @@ class LLMSingleNeedleHaystackTester:
         return new_context
 
     def get_context_length_in_tokens(self, context):
-        """Get token count of context."""
+        """获取上下文的 token 数量。"""
         return len(self.model_to_test.encode_text_to_tokens(context))
 
     def read_context_files(self):
-        """Read and concatenate all haystack files."""
+        """读取并拼接所有原始文本文件形成大上下文。"""
         context = ""
         max_context_length = max(self.context_lengths)
         base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -260,18 +259,18 @@ class LLMSingleNeedleHaystackTester:
         return context
 
     def encode_and_trim(self, context, context_length):
-        """Encode context to tokens and trim to specified length."""
+        """将上下文编码为 tokens 并截断到指定长度。"""
         tokens = self.model_to_test.encode_text_to_tokens(context)
         if len(tokens) > context_length:
             context = self.model_to_test.decode_tokens(tokens, context_length)
         return context
 
     def get_results(self):
-        """Get all testing results."""
+        """获取全部测试结果。"""
         return self.testing_results
 
     def print_start_test_summary(self):
-        """Print summary of test configuration."""
+        """打印测试配置摘要。"""
         print("\n")
         print("Starting Needle In A Haystack Testing...")
         print(f"- Model: {self.model_name}")
@@ -283,7 +282,7 @@ class LLMSingleNeedleHaystackTester:
         print("\n\n")
 
     def start_test(self):
-        """Start the testing process."""
+        """启动测试流程。"""
         if self.print_ongoing_status:
             self.print_start_test_summary()
         asyncio.run(self.run_test())

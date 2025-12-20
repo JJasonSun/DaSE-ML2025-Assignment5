@@ -8,17 +8,17 @@ from model import ModelProvider
 
 class ExampleAgent(ModelProvider):
     """
-    Example implementation of a multi-document retrieval agent.
+    多文档检索 Agent 的示例实现。
 
-    This baseline implementation demonstrates the interface but uses a naive strategy:
-    - Randomly selects 1 text file
-    - Randomly extracts 10000 tokens
+    该基线实现仅用于演示接口，策略非常简单：
+    - 随机选择 1 个文本文件
+    - 随机截取 10000 个 token
     
-    For better performance, consider implementing:
-    - Retrieval from all relevant files
-    - RAG (Retrieval-Augmented Generation) with vector search
-    - Intelligent file selection based on relevance
-    - Query-aware context extraction
+    如需更佳效果，可考虑：
+    - 汇总所有相关文件的信息
+    - 使用向量检索的 RAG 流程
+    - 基于相关性的智能文件选择
+    - 与查询相关的上下文抽取
     """
 
     def __init__(self, api_key: str, base_url: str):
@@ -30,25 +30,25 @@ class ExampleAgent(ModelProvider):
 
     async def evaluate_model(self, prompt: Dict) -> str:
         """
-        Handle multi-document retrieval task.
+        处理多文档检索任务。
 
-        Baseline strategy:
-        1. Randomly select 1 file from all available files
-        2. Randomly extract 10000 tokens from that file
-        3. Send to LLM for answering
+        基线策略：
+        1. 在所有文件中随机选取 1 个
+        2. 从该文件随机截取 10000 个 token
+        3. 发送给模型生成答案
         
-        This is a naive approach for demonstration purposes.
+        该方案仅用于演示。
 
         Args:
-            prompt: Dictionary containing context_data and question
+            prompt: 包含 context_data 与 question 的字典
 
         Returns:
-            Model response
+            模型回答
         """
         context_data = prompt['context_data']
         question = prompt['question']
 
-        # Use baseline random selection strategy
+        # 使用基线随机策略
         selected_content = self._random_select_strategy(context_data)
 
         messages = [
@@ -73,31 +73,30 @@ class ExampleAgent(ModelProvider):
 
     def _random_select_strategy(self, context_data: Dict) -> str:
         """
-        Baseline strategy: Randomly select 1 file and extract 10000 tokens.
+        基线策略：随机选 1 个文件并截取 10000 个 token。
 
-        This is intentionally naive to demonstrate the interface.
-        Implement smarter retrieval strategies for better performance.
+        该实现故意简化以展示接口，实际可实现更智能的检索。
 
         Args:
-            context_data: Dictionary containing all file information
+            context_data: 包含所有文件信息的字典
 
         Returns:
-            Extracted text content
+            截取后的文本内容
         """
         files = context_data['files']
 
-        # Randomly select one file
+        # 随机选择一个文件
         selected_file = random.choice(files)
         print(f"[Baseline] Randomly selected file: {selected_file['filename']}")
 
         content = selected_file['modified_content']
         tokens = self.encode_text_to_tokens(content)
 
-        # If file is smaller than max tokens, return entire content
+        # 若文件长度不足上限则直接返回全部内容
         if len(tokens) <= self.max_tokens_per_request:
             return content
 
-        # Randomly extract a chunk
+        # 随机截取一段文本
         max_start = len(tokens) - self.max_tokens_per_request
         start_pos = random.randint(0, max_start)
         end_pos = start_pos + self.max_tokens_per_request
@@ -109,13 +108,13 @@ class ExampleAgent(ModelProvider):
 
     def generate_prompt(self, **kwargs) -> Dict:
         """
-        Generate prompt structure for the model.
+        生成传给模型的 prompt 结构。
 
         Args:
-            **kwargs: Flexible parameters (context_data, question, etc.)
+            **kwargs: 传入的上下文、问题等参数
 
         Returns:
-            Dictionary containing all prompt information
+            包含 prompt 信息的字典
         """
         return {
             'context_data': kwargs.get('context_data'),
@@ -123,11 +122,11 @@ class ExampleAgent(ModelProvider):
         }
 
     def encode_text_to_tokens(self, text: str) -> List[int]:
-        """Encode text to token IDs."""
+        """将文本编码成 token 序列。"""
         return self.tokenizer.encode(text)
 
     def decode_tokens(self, tokens: List[int], context_length: Optional[int] = None) -> str:
-        """Decode token IDs to text."""
+        """将 token 序列解码为文本。"""
         if context_length:
             tokens = tokens[:context_length]
         return self.tokenizer.decode(tokens)

@@ -17,7 +17,7 @@ load_dotenv()
 
 @dataclass
 class CommandArgs:
-    """Command line arguments"""
+    """命令行参数配置"""
     agent: str
     test_case_json: str
 
@@ -25,7 +25,7 @@ class CommandArgs:
     base_url: Optional[str] = None
 
     test_mode: Optional[str] = "multi"
-    evaluator_type: Optional[str] = "string"  # 'string' or 'llm'
+    evaluator_type: Optional[str] = "string"  # 可选 'string' 或 'llm'
     haystack_dir: Optional[str] = "PaulGrahamEssays"
     results_version: Optional[int] = 1
 
@@ -44,13 +44,13 @@ class CommandArgs:
 
 def parse_agent_spec(agent_spec: str) -> Tuple[str, str]:
     """
-    Parse agent specification string.
+    解析 Agent 规范字符串。
 
     Args:
-        agent_spec: Format "module.path:ClassName"
+        agent_spec: 形如 "module.path:ClassName" 的字符串
 
     Returns:
-        Tuple of (module_name, class_name)
+        (module_name, class_name) 的二元组
     """
     if ':' not in agent_spec:
         raise ValueError(
@@ -64,15 +64,15 @@ def parse_agent_spec(agent_spec: str) -> Tuple[str, str]:
 
 def load_agent(agent_spec: str, api_key: str, base_url: str) -> ModelProvider:
     """
-    Dynamically load agent implementation.
+    动态加载 Agent 实现。
 
     Args:
-        agent_spec: Agent specification "module.path:ClassName"
-        api_key: API key
-        base_url: API base URL
+        agent_spec: Agent 规范 "module.path:ClassName"
+        api_key: 接口密钥
+        base_url: 接口基础地址
 
     Returns:
-        Agent instance
+        Agent 实例
     """
     module_name, class_name = parse_agent_spec(agent_spec)
     module = importlib.import_module(module_name)
@@ -83,24 +83,24 @@ def load_agent(agent_spec: str, api_key: str, base_url: str) -> ModelProvider:
 def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
                          base_url: str, args: CommandArgs) -> List[dict]:
     """
-    Run a single test case.
+    运行单个测试用例。
 
     Args:
-        test_case: Test case dictionary
-        agent_spec: Agent specification
-        api_key: API key
-        base_url: API base URL
-        args: Command arguments
+        test_case: 测试用例字典
+        agent_spec: Agent 规范
+        api_key: 接口密钥
+        base_url: 接口基础地址
+        args: 命令行参数
 
     Returns:
-        List of test results
+        测试结果列表
     """
     needles = get_needles(test_case)
 
-    # Load agent
+    # 加载 Agent
     agent = load_agent(agent_spec, api_key, base_url)
 
-    # Initialize evaluator based on type
+    # 根据类型初始化评测器
     if args.evaluator_type == 'llm':
         evaluator = LLMEvaluator(
             api_key=api_key,
@@ -117,7 +117,7 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
     else:
         raise ValueError(f"Invalid evaluator_type: {args.evaluator_type}. Must be 'string' or 'llm'")
 
-    # Create and run tester
+    # 创建并运行测试器
     if args.test_mode == 'multi':
         tester = LLMMultiNeedleHaystackTester(
             model_to_test=agent,
@@ -158,7 +158,7 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
 
 
 def main():
-    """Main function"""
+    """程序入口"""
     args = CLI(CommandArgs, as_positional=False)
 
     api_key = args.api_key or os.getenv('API_KEY')
@@ -173,7 +173,7 @@ def main():
     if args.evaluator_type not in ['string', 'llm']:
         raise ValueError(f"evaluator_type must be 'string' or 'llm', got: {args.evaluator_type}")
 
-    # Load all test cases
+    # 加载所有测试用例
     test_cases = load_test_cases(args.test_case_json)
 
     print("\n" + "=" * 80)
@@ -181,7 +181,7 @@ def main():
     print(f"Evaluator Type: {args.evaluator_type}")
     print("=" * 80)
 
-    # Run all test cases
+    # 逐个运行测试用例
     all_results = []
     test_case_summaries = []
 
@@ -209,13 +209,13 @@ def main():
                 args=args
             )
 
-            # Add test case ID to each result
+            # 将测试用例 ID 加入每条结果
             for result in results:
                 result['test_case_id'] = test_id
 
             all_results.extend(results)
 
-            # Calculate summary for this test case
+            # 计算当前测试用例的统计摘要
             scores = [r['score'] for r in results]
             summary = {
                 'test_case_id': test_id,
@@ -243,7 +243,7 @@ def main():
             traceback.print_exc()
             continue
 
-    # Print overall summary
+    # 输出总体统计
     print("\n" + "=" * 80)
     print("OVERALL TEST SUMMARY")
     print("=" * 80)

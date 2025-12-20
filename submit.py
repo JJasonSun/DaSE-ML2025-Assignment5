@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Needle in Haystack Assignment Submission Tool
+Needle in Haystack 作业提交工具
 
-This is the command-line entry point for submitting your agent.
-The core logic is in submit_core module (which can be compiled to .so).
+命令行入口脚本，核心逻辑在 submit_core 模块（可能以 .so 形式提供）。
 
-Usage:
+用法:
     python submit.py --agent agent_template:ExampleAgent
     python submit.py --agent my_agent:MyAgent --api-key sk-xxx --base-url https://api.openai.com/v1
 
-Required environment variables:
+所需环境变量:
     STUDENT_ID, STUDENT_NAME, STUDENT_NICKNAME, MAIN_CONTRIBUTOR, API_KEY, BASE_URL
-    (API_KEY and BASE_URL can also be passed as command arguments)
+    （API_KEY 和 BASE_URL 也可通过命令行参数传入）
 """
 
 import sys
@@ -23,7 +22,7 @@ from submit_core import run_submission
 
 
 def parse_arguments():
-    """Parse command line arguments"""
+    """解析命令行参数"""
     parser = argparse.ArgumentParser(
         description='Submit your Needle in Haystack agent for evaluation',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -52,28 +51,28 @@ Environment Variables Required:
         '-a', '--agent',
         type=str,
         required=True,
-        help='Agent specification in format "module.path:ClassName" (e.g., agent_template:ExampleAgent)'
+        help='Agent 规范，格式为 "module.path:ClassName"（如 agent_template:ExampleAgent）'
     )
 
     parser.add_argument(
         '--api-key',
         type=str,
         default=None,
-        help='API key for LLM service (overrides API_KEY environment variable)'
+        help='LLM 服务的 API Key（优先于环境变量 API_KEY）'
     )
 
     parser.add_argument(
         '--base-url',
         type=str,
         default=None,
-        help='API base URL (overrides BASE_URL environment variable)'
+        help='LLM 服务的基础地址（优先于环境变量 BASE_URL）'
     )
 
     return parser.parse_args()
 
 
 def main():
-    """Main entry point"""
+    """程序入口"""
     try:
         args = parse_arguments()
     except SystemExit:
