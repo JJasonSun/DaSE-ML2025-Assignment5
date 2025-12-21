@@ -57,7 +57,7 @@
       --agent agents.sync_agent:SyncRetrievalAgent \
       --test_case_json test_cases/test_cases_all_en.json \
       --test_mode multi \            # 可选 single/multi
-      --evaluator_type string \      # 可选 string/llm
+      --evaluator_type llm \         # 可选 string/llm
       --num_tests 3                  # 多文档模式下重复次数
    ```
 
@@ -67,11 +67,11 @@
       --agent agents.sync_agent:SyncRetrievalAgent `
       --test_case_json test_cases/test_cases_all_en.json `
       --test_mode multi `
-      --evaluator_type string `
+      --evaluator_type llm `
       --num_tests 3
    ```
 
-   > ⚠️ 虽然示例中用了 `--evaluator_type string` 来快速获得确定性结果，但别忘了根据 `Assignment5.md`，**正式宜优先使用 `LLMEvaluator`（即 `--evaluator_type llm`）作为默认值**，因为整个评测流程最终是通过 LLM 评分的。`string` 模式只是为了快速验证、调试 forward，而本质上也会调用一次模型（更简洁的 API 结果比对），因此并没有“零成本”。
+   > 💡 **提示**：示例中默认使用 `--evaluator_type llm`，因为这是正式评测的标准。如果你在开发初期需要快速验证逻辑、节省 API 消耗，可以使用 `--evaluator_type string` 进行精确匹配测试。
    >
 
    - `--haystack_dir` 可指定其他文本目录。
@@ -138,7 +138,7 @@ python run.py \
    --agent agents.sync_agent:SyncRetrievalAgent \
    --test_case_json test_cases/test_cases_all_en.json \
    --test_mode single \
-   --evaluator_type string \
+   --evaluator_type llm \
    --num_tests 1
 ```
 
@@ -148,11 +148,11 @@ python run.py `
    --agent agents.sync_agent:SyncRetrievalAgent `
    --test_case_json test_cases/test_cases_all_en.json `
    --test_mode single `
-   --evaluator_type string `
+   --evaluator_type llm `
    --num_tests 1
 ```
 
-> ⚠️ sample 中为了让 smoke test 更快更可控所以用 `--evaluator_type string`，但正式的本地验证应**默认走 `--evaluator_type llm`**（与 `Assignment5.md` 中默认一致），`string` 模式只是为了低成本调试；无论哪种模式，整个流程都会发起 LLM API 调用。
+> 💡 **提示**：此处使用 `--evaluator_type llm` 进行语义评测。在开发初期，若需快速验证逻辑，可临时切换为 `string` 模式。
 
 3) 完整评测并保存结果（生成 `results/`，用于提交与统计）
 
@@ -162,7 +162,7 @@ python run.py \
    --agent agents.sync_agent:SyncRetrievalAgent \
    --test_case_json test_cases/test_cases_all_en.json \
    --test_mode multi \
-   --evaluator_type string \
+   --evaluator_type llm \
    --num_tests 5 \
    --save_results True
 ```
@@ -173,7 +173,7 @@ python run.py `
    --agent agents.sync_agent:SyncRetrievalAgent `
    --test_case_json test_cases/test_cases_all_en.json `
    --test_mode multi `
-   --evaluator_type string `
+   --evaluator_type llm `
    --num_tests 5 `
    --save_results True
 ```
