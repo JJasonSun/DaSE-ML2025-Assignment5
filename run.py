@@ -112,7 +112,8 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
             api_key=api_key,
             base_url=base_url,
             ground_truth=test_case['ground_truth'],
-            question=test_case['question']
+            question=test_case['question'],
+            model_name=agent.model_name
         )
     elif args.evaluator_type == 'string':
         evaluator = StringMatchEvaluator(

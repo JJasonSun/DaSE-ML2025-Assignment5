@@ -1,9 +1,6 @@
 from typing import List, Dict, Optional
-from openai import AsyncOpenAI
 import tiktoken
 import random
-import os
-from dotenv import load_dotenv
 
 from model import ModelProvider
 
@@ -25,10 +22,6 @@ class ExampleAgent(ModelProvider):
 
     def __init__(self, api_key: str, base_url: str):
         super().__init__(api_key, base_url)
-        # 从环境变量 TEST_MODEL 读取模型名
-        load_dotenv()
-        self.model_name = os.getenv('TEST_MODEL')
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.max_tokens_per_request = 10000
 
@@ -66,14 +59,11 @@ class ExampleAgent(ModelProvider):
             }
         ]
 
-        response = await self.client.chat.completions.create(
-            model=self.model_name,
+        return await self._create_chat_completion(
             messages=messages,
             temperature=0,
             max_tokens=300
         )
-
-        return response.choices[0].message.content
 
     def _random_select_strategy(self, context_data: Dict) -> str:
         """

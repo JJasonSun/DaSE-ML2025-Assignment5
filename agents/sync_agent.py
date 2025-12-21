@@ -1,36 +1,25 @@
 from typing import List, Dict, Optional
 import tiktoken
 import re
-import requests
-import json
-import time
-import os
-from dotenv import load_dotenv
-
 from model import ModelProvider
-
 
 class SyncRetrievalAgent(ModelProvider):
     """
     同步版多文档检索 Agent，避免 asyncio 问题。
-    使用 requests 替代 AsyncOpenAI，规避事件循环限制。
+    使用基类的通用API调用方法，支持控制推理过程。
     
     提升准确率的优化点：
     1. 增强关键词提取（数字、日期、编码）
     2. 更好的文件打分算法
     3. 句子级内容抽取
     4. 多策略组合搜索
+    5. 禁用推理模式获得直接答案
     """
 
     def __init__(self, api_key: str, base_url: str):
         super().__init__(api_key, base_url)
-        # 从环境变量 TEST_MODEL 读取模型名
-        load_dotenv()
-        self.model_name = os.getenv('TEST_MODEL')
-        self.api_key = api_key
-        self.base_url = base_url.rstrip('/')
         self.tokenizer = tiktoken.encoding_for_model("gpt-4") # 使用 GPT-4 的编码器
-        self.max_tokens_per_request = 10000  # 提高上限以覆盖更多上下文
+        self.max_tokens_per_request = 512  # 提高上限以覆盖更多上下文
         self.top_k_files = 5  # 从 3 提升至 5
 
     async def evaluate_model(self, prompt: Dict) -> str:
@@ -38,64 +27,79 @@ class SyncRetrievalAgent(ModelProvider):
         通过同步 HTTP 请求完成多文档检索。
         """
         try:
-            context_data = prompt['context_data']
-            question = prompt['question']
+            context_data = prompt.get('context_data', {})
+            question = prompt.get('question', '')
+            
+            if not context_data or not question:
+                return "缺少必要的输入数据"
 
             # 提取相关内容
             selected_content = self._retrieve_content(context_data, question)
+            
+            if not selected_content or selected_content == "No relevant content found.":
+                return "未找到相关内容"
 
             # 构造消息
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a helpful AI assistant. Answer the question based on the provided context. If you find relevant information, provide a clear and accurate answer. If the information is not sufficient, say so clearly."
+                    "content": "你是一位严谨且高效的问答助手。以下规则必须同时满足：\n1. 准确提取上下文信息。如果问题涉及日期计算或星期推算，请基于上下文中的日期进行推导。\n2. 不要输出多余文字，只提供最终答案。\n3. 处理日期/星期时，请返回英文格式（例：Thursday, December 25, 2031）。\n4. 数字类问题请直接给出阿拉伯数字。\n5. 如果无法判断答案，返回“无法生成有效回答”。\n6. 最终答案必须使用英文表达。"
                 },
                 {
                     "role": "user",
-                    "content": f"Context:\n{selected_content}\n\nQuestion: {question}\n\nAnswer:"
+                    "content": f"根据以下上下文直接回答问题，不需要说明过程。\n\n上下文内容：\n{selected_content}\n\n问题：{question}\n\n请直接写出答案："
                 }
             ]
 
-            # 发起同步 API 调用
-            return self._make_sync_api_call(messages)
-                
-        except Exception as e:
-            return f"Processing error: {str(e)[:50]}"
-
-    def _make_sync_api_call(self, messages: List[Dict]) -> str:
-        """
-        使用同步请求避免 asyncio 相关问题。
-        """
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model_name,
-                "messages": messages,
-                "temperature": 0,
-                "max_tokens": 500
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=20
+            # 使用基类的API调用方法，增加 max_tokens 以应对推理模型
+            response = await self._create_chat_completion(
+                messages=messages,
+                temperature=0,
+                max_tokens=1500,
+                timeout=30
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                return result['choices'][0]['message']['content']
-            else:
-                return f"API error: {response.status_code}"
+            # 如果响应为空或包含错误信息，尝试备用策略
+            if not response or response.strip() == "" or "error" in response.lower() or "empty" in response.lower():
+                # 尝试更简单的prompt
+                backup_messages = [
+                    {
+                        "role": "system",
+                        "content": "你是一位只输出最终结果的中文助手。遇到无法确定时说“无法生成有效回答”。最终答案必须使用英文。"
+                    },
+                    {
+                        "role": "user",
+                        "content": f"请参考下面的信息，直接给出答案，不需要过程。\n\n{selected_content}\n\n问题：{question}\n\n答案："
+                    }
+                ]
+                response = await self._create_chat_completion(
+                    messages=backup_messages,
+                    temperature=0.1,
+                    max_tokens=100,
+                    timeout=15
+                )
+            
+            # 最终检查和清理响应
+            if response and response.strip():
+                cleaned_response = response.strip()
+                # 移除可能的前缀和后缀
+                prefixes_to_remove = ['答案：', 'Answer:', 'The answer is', 'Based on', 'According to']
+                for prefix in prefixes_to_remove:
+                    if cleaned_response.startswith(prefix):
+                        cleaned_response = cleaned_response[len(prefix):].strip()
+                        if cleaned_response.startswith(':'):
+                            cleaned_response = cleaned_response[1:].strip()
                 
-        except requests.exceptions.Timeout:
-            return "Request timed out."
+                # 移除句号等标点符号（如果答案是单个词）
+                if len(cleaned_response.split()) == 1:
+                    cleaned_response = cleaned_response.rstrip('.,!?;')
+                
+                return cleaned_response
+            else:
+                return "无法生成有效回答"
+                
         except Exception as e:
-            return f"API call error: {str(e)[:50]}"
+            return f"处理错误: {str(e)[:50]}"
 
     def _retrieve_content(self, context_data: Dict, question: str) -> str:
         """
