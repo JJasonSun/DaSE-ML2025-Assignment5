@@ -2,6 +2,8 @@ from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 import tiktoken
 import random
+import os
+from dotenv import load_dotenv
 
 from model import ModelProvider
 
@@ -23,7 +25,9 @@ class ExampleAgent(ModelProvider):
 
     def __init__(self, api_key: str, base_url: str):
         super().__init__(api_key, base_url)
-        self.model_name = "ecnu-max"
+        # 从环境变量 TEST_MODEL 读取模型名
+        load_dotenv()
+        self.model_name = os.getenv('TEST_MODEL')
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.max_tokens_per_request = 10000

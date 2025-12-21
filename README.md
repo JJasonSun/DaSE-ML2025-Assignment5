@@ -56,6 +56,21 @@
    - 单文档模式可调节 `context_lengths_*` 与 `document_depth_percent_*` 控制长度与插入位置。
    - 运行结束后，若 `save_results=True`，结果写入 `results/`，上下文（可选）写入 `contexts/`。
 
+### 参数说明：`test_mode` 与 `evaluator_type`
+
+- `test_mode`（测试模式）
+   - 可选：`multi` 或 `single`。
+   - `multi`：多文档/多 needle 场景，使用 `LLMMultiNeedleHaystackTester`。适合评估模型在不同文档与不同插入位置上的鲁棒性，会对每个用例进行多次随机试验（受 `--num-tests` 控制），但 API 调用与运行时间较多。
+   - `single`：单文档/单 needle 场景，使用 `LLMSingleNeedleHaystackTester`。适合做上下文长度（`context_lengths_*`）和插入深度（`document_depth_percent_*`）的网格扫描与可重复实验，便于分析模型对上下文规模的敏感性。
+
+- `evaluator_type`（评测器类型）
+   - 可选：`string` 或 `llm`。
+   - `string`：使用 `StringMatchEvaluator` 进行精确字符串匹配（可忽略大小写/空白）。快速、确定性强且无需额外 API 成本，适合 exact-match 场景。
+   - `llm`：使用 `LLMEvaluator` 通过另一个大模型对输出与 ground truth 做语义评分。能识别同义改写与部分正确，但会增加延迟与 API 成本，评分有一定随机性。
+
+选择建议：若需快速批量验证用 `--evaluator-type string`；若想评估语义等价或更接近人工判断可选 `--evaluator-type llm`。若评估多文档检索稳健性选 `--test-mode multi`，做可控变量扫描时选 `--test-mode single`。
+
+
 4. **查看与调试**
    - 控制台会输出每个用例的得分、均值、最好/最差等统计。
    - 开启 `--print-ongoing-status` 可实时查看插入 needle、生成 prompt 与模型响应摘要。
@@ -66,6 +81,50 @@
    ```
    - 优先从命令行读取 `--api-key` / `--base-url`，否则回退到 `.env`。
    - 提交脚本会校验 `STUDENT_ID`、`STUDENT_NAME`、`STUDENT_NICKNAME`、`MAIN_CONTRIBUTOR` 等信息。
+
+## 推荐工作流（开发 → 评测 → 提交）及示例命令
+
+下面给出从本地开发到最终提交的推荐流程与示例命令：
+
+1) 快速验证 API 与环境（轻量）
+
+```bash
+python check_api.py
+```
+
+2) 小规模验证 / smoke test（快速迭代，低成本）
+
+```bash
+python run.py \
+   --agent agents.sync_agent:SyncRetrievalAgent \
+   --test-case-json test_cases/test_cases_all_en.json \
+   --test-mode single \
+   --evaluator-type string \
+   --num-tests 1
+```
+
+3) 完整评测并保存结果（生成 `results/`，用于提交与统计）
+
+```bash
+python run.py \
+   --agent agents.sync_agent:SyncRetrievalAgent \
+   --test-case-json test_cases/test_cases_all_en.json \
+   --test-mode multi \
+   --evaluator-type string \
+   --num-tests 5 \
+   --save-results True
+```
+
+4) 提交（确认 `results/` 与 `.env` 中的学生信息正确后）
+
+```bash
+python submit.py --agent your_module:YourAgentClass
+```
+
+要点提示：
+- 使用小规模验证（step 2）可以快速定位逻辑/prompt 问题，避免一次耗尽配额。
+- 若选择 `--evaluator-type llm`，评估步骤会额外产生 API 调用与延迟，请预留配额并酌情减少 `num-tests`。
+- 确保 `.env` 中 `API_KEY`、`BASE_URL`、学生信息字段已正确填写（`check_api.py` 可快速验证连通性）。
 
 ## 结果与输出
 - `results/*.json`：保存模型回答、得分、运行时间、needle 信息等。
