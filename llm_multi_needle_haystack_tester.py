@@ -12,10 +12,10 @@ from model import ModelProvider
 
 class LLMMultiNeedleHaystackTester:
     """
-    Multi-document Needle test framework.
+    多文档 Needle 测试框架。
     
-    - Needles are randomly inserted into different text files at different depths
-    - The agent needs to retrieve information from all relevant files
+    - 将多个 needle 随机插入不同文本文件且深度随机
+    - Agent 需要从所有相关文件中检索信息
     """
 
     def __init__(self,
@@ -30,19 +30,19 @@ class LLMMultiNeedleHaystackTester:
                  print_ongoing_status: bool = True,
                  num_tests: int = 1):
         """
-        Initialize multi-document test framework.
+        初始化多文档测试框架。
 
         Args:
-            model_to_test: The agent model to test
-            evaluator: Evaluator for scoring responses
-            needles: List of information to be inserted
-            haystack_dir: Folder containing text files
-            question: Question to ask about the needles
-            results_version: Version number for results
-            save_results: Whether to save test results
-            save_contexts: Whether to save generated contexts
-            print_ongoing_status: Whether to print progress
-            num_tests: Number of test runs (each with random insertion positions)
+            model_to_test: 待测 Agent
+            evaluator: 评分器
+            needles: 需要插入的关键信息列表
+            haystack_dir: 文本文件所在目录
+            question: 针对 needles 的提问
+            results_version: 结果版本号
+            save_results: 是否保存测试结果
+            save_contexts: 是否保存生成的上下文
+            print_ongoing_status: 是否打印运行进度
+            num_tests: 运行次数（每次插入位置随机）
         """
         if not model_to_test or not needles or not question:
             raise ValueError("model_to_test, needles, and question must be provided.")
@@ -66,10 +66,10 @@ class LLMMultiNeedleHaystackTester:
 
     def _load_all_txt_files(self) -> List[Dict[str, str]]:
         """
-        Load all text files from the haystack directory.
+        从 haystack 目录加载所有文本文件。
 
         Returns:
-            List of dict: [{"path": "xxx.txt", "content": "...", "tokens": [...]}, ...]
+            字典列表：[{\"path\": \"xxx.txt\", \"content\": \"...\", \"tokens\": [...]}, ...]
         """
         base_dir = os.path.abspath(os.path.dirname(__file__))
         txt_dir = os.path.join(base_dir, self.haystack_dir)
@@ -100,32 +100,32 @@ class LLMMultiNeedleHaystackTester:
 
     def _insert_needle_into_file(self, file_data: Dict, needle: str) -> Dict:
         """
-        Insert needle randomly into a file at some depth.
+        将 needle 随机插入某个文件的不同深度。
 
         Args:
-            file_data: File data dictionary
-            needle: Needle to insert
+            file_data: 文件信息字典
+            needle: 待插入的 needle
 
         Returns:
-            dict: {"filename": ..., "depth_percent": ..., "modified_content": ...}
+            dict: {\"filename\": ..., \"depth_percent\": ..., \"modified_content\": ...}
         """
         tokens = file_data['tokens'].copy()
         needle_tokens = self.model_to_test.encode_text_to_tokens(needle)
 
-        # Random depth percentage
+        # 随机生成插入深度百分比
         depth_percent = random.uniform(0, 100)
         insertion_point = int(len(tokens) * (depth_percent / 100))
 
-        # Find nearest sentence boundary
+        # 找到最近的句子边界
         period_tokens = self.model_to_test.encode_text_to_tokens('.')
         while insertion_point > 0 and tokens[insertion_point - 1] not in period_tokens:
             insertion_point -= 1
 
-        # Insert needle
+        # 插入 needle
         new_tokens = tokens[:insertion_point] + needle_tokens + tokens[insertion_point:]
         modified_content = self.model_to_test.decode_tokens(new_tokens)
 
-        # Calculate actual depth
+        # 计算实际深度
         actual_depth = (insertion_point / len(tokens)) * 100
 
         return {
@@ -138,18 +138,18 @@ class LLMMultiNeedleHaystackTester:
 
     def _generate_multi_doc_context(self) -> Dict:
         """
-        Generate multi-document context with each needle inserted into a different text file.
+        生成多文档上下文，每个 needle 插入到不同文件。
 
         Returns:
             dict: {
-                "files": [list of ALL files, with needles inserted where applicable],
-                "needle_locations": [{"needle": ..., "filename": ..., "depth": ...}]
+                "files": 所有文件（含插入结果）的列表,
+                "needle_locations": 记录 needle 位置的列表
             }
         """
-        # Randomly select files for each needle
+        # 为每个 needle 随机选择文件
         selected_files = random.sample(self.txt_files, len(self.needles))
 
-        # Create a mapping of which files have needles
+        # 创建文件与 needle 的映射
         needle_file_map = {}
         for needle, file_data in zip(self.needles, selected_files):
             needle_file_map[file_data['filename']] = needle
@@ -157,12 +157,12 @@ class LLMMultiNeedleHaystackTester:
         all_files = []
         needle_locations = []
 
-        # Process all files
+        # 处理所有文件
         for file_data in self.txt_files:
             filename = file_data['filename']
 
             if filename in needle_file_map:
-                # This file gets a needle inserted
+                # 该文件需要插入 needle
                 needle = needle_file_map[filename]
                 modified = self._insert_needle_into_file(file_data, needle)
                 all_files.append(modified)
@@ -177,51 +177,51 @@ class LLMMultiNeedleHaystackTester:
                     print(
                         f"  Inserted '{needle.strip()[:50]}...' into {modified['filename']} at {modified['depth_percent']:.1f}%")
             else:
-                # This file remains unchanged
+                # 未被选中的文件保持不变
                 all_files.append({
                     'filename': file_data['filename'],
-                    'depth_percent': 0,  # No needle inserted
+                    'depth_percent': 0,  # 未插入 needle
                     'modified_content': file_data['content'],
                     'original_tokens': file_data['token_count'],
                     'new_tokens': file_data['token_count']
                 })
 
         return {
-            'files': all_files,  # Now includes ALL files
+            'files': all_files,  # 包含所有文件
             'needle_locations': needle_locations
         }
 
     async def evaluate_and_log(self, test_number: int):
         """
-        Execute one test.
+        执行单次测试。
 
         Args:
-            test_number: Test number
+            test_number: 测试编号
         """
         if self.print_ongoing_status:
             print(f"\n{'=' * 60}")
             print(f"Test #{test_number}")
             print(f"{'=' * 60}")
 
-        # Generate context with needles
+        # 构造带有 needle 的上下文
         context_data = self._generate_multi_doc_context()
 
-        # Generate prompt
+        # 生成 prompt
         prompt = self.model_to_test.generate_prompt(
             context_data=context_data,
             question=self.question
         )
 
-        # Run model
+        # 调用模型
         test_start_time = time.time()
         response = await self.model_to_test.evaluate_model(prompt)
         test_end_time = time.time()
         test_elapsed_time = test_end_time - test_start_time
 
-        # Evaluate response
+        # 评估回答
         score = self.evaluator.evaluate_response(response)
 
-        # Collect results
+        # 汇总结果
         results = {
             'test_number': test_number,
             'model': self.model_to_test.model_name,
@@ -244,7 +244,7 @@ class LLMMultiNeedleHaystackTester:
             print(f"Score: {score}/10")
             print(f"Response: {response}\n")
 
-        # Save results
+        # 保存结果
         if self.save_results:
             if not os.path.exists('results'):
                 os.makedirs('results')
@@ -253,7 +253,7 @@ class LLMMultiNeedleHaystackTester:
             with open(result_file, 'w') as f:
                 json.dump(results, f, indent=2)
 
-        # Save contexts
+        # 保存上下文
         if self.save_contexts:
             if not os.path.exists('contexts'):
                 os.makedirs('contexts')
@@ -264,12 +264,12 @@ class LLMMultiNeedleHaystackTester:
                     f.write(modified_file['modified_content'])
 
     async def run_test(self):
-        """Run all tests."""
+        """运行所有测试。"""
         for i in range(1, self.num_tests + 1):
             await self.evaluate_and_log(i)
 
     def print_start_test_summary(self):
-        """Print test configuration summary."""
+        """打印测试配置摘要。"""
         print("\n" + "=" * 60)
         print("Starting Multi-Document Needle Retrieval Testing")
         print("=" * 60)
@@ -283,11 +283,11 @@ class LLMMultiNeedleHaystackTester:
         print("=" * 60 + "\n")
 
     def start_test(self):
-        """Start testing."""
+        """开始测试。"""
         if self.print_ongoing_status:
             self.print_start_test_summary()
         asyncio.run(self.run_test())
 
     def get_results(self):
-        """Get all test results."""
+        """获取全部测试结果。"""
         return self.testing_results

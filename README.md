@@ -1,0 +1,80 @@
+# DaSE-ML2025-Assignment5 说明
+
+## 项目简介
+本项目实现“Needle in a Haystack”长文本检索评测框架。系统会把若干关键信息（needle）随机插入多篇文章（haystack）中，并调用你实现的 Agent 来回答相关问题，最后使用评测器打分。你可以用该框架本地调试、提交并查看排行榜成绩。
+
+## 环境与依赖
+1. 安装依赖：`pip install -r requirements.txt`  
+2. 在项目根目录创建 `.env`，填写：
+   ```env
+   API_KEY=你的API密钥
+   BASE_URL=https://chat.ecnu.edu.cn/open/api/v1  # 或你的兼容 OpenAI 的服务地址
+   STUDENT_ID=学号
+   STUDENT_NAME=姓名
+   STUDENT_NICKNAME=昵称（排行榜显示）
+   MAIN_CONTRIBUTOR=human   # 或 ai
+   TEST_MODEL=用于 check_api 的模型名称（可选）
+   ```
+3. 可运行 `python check_api.py` 验证 API_KEY 与 BASE_URL 是否可用；若设置了 TEST_MODEL 会顺便做一次推理测试。
+
+## 目录速览与文件作用
+- `run.py`：命令行入口，读取测试用例并调用对应的测试器与评测器。
+- `llm_multi_needle_haystack_tester.py`：多文档场景测试器，将多个 needle 插入不同文件并评测。
+- `llm_single_needle_haystack_tester.py`：单文档场景测试器，支持不同上下文长度与插入深度的组合。
+- `model.py`：`ModelProvider` 抽象基类，定义 Agent 必须实现的接口。
+- `agents/`：示例与参考 Agent，`agent_template.py`（异步示例），`sync_agent.py`（同步示例）。
+- `evaluators/`：评测器实现，`string_match_evaluator` 为精确匹配，`llm_evaluator` 使用大模型评分。
+- `test_case_loader.py`：读取与校验测试用例 JSON。
+- `test_cases/`：示例或评测用的测试用例文件夹。
+- `PaulGrahamEssays/`：默认的 haystack 文本集合。
+- `submit.py` + `submit_core.*`：提交脚本与核心实现。
+- `Assignment5.md`：作业原文说明与评分规则。
+- `check_api.py`：快速验证 API 连通性的小工具。
+
+## 工作流与运行方式
+1. **编写 Agent**
+   - 继承 `model.ModelProvider` 并实现四个接口：
+     - `evaluate_model`：接收 prompt 字典（包含上下文与问题），返回回答字符串。
+     - `generate_prompt`：组装传给 `evaluate_model` 的字典结构。
+     - `encode_text_to_tokens` / `decode_tokens`：用于计算、截断与还原文本长度。
+   - 可参考 `agents/agent_template.py`（基线随机策略）或 `agents/sync_agent.py`（同步、多策略检索）进行二次开发。
+
+2. **准备测试用例**
+   - 将自定义测试集写入 JSON，字段至少包含 `needle`、`question`、`ground_truth`，可选 `id`。
+   - 通过 `test_case_loader.py` 自动判断单 needle 或多 needle（`needle` 为列表且长度>1 时视为多 needle）。
+
+3. **本地运行评测**
+   ```bash
+   python run.py \
+     --agent agents.sync_agent:SyncRetrievalAgent \
+     --test-case-json test_cases/test_cases_all_en.json \
+     --test-mode multi \            # 可选 single/multi
+     --evaluator-type string \      # 可选 string/llm
+     --num-tests 3                  # 多文档模式下重复次数
+   ```
+   - `--haystack-dir` 可指定其他文本目录。
+   - 单文档模式可调节 `context_lengths_*` 与 `document_depth_percent_*` 控制长度与插入位置。
+   - 运行结束后，若 `save_results=True`，结果写入 `results/`，上下文（可选）写入 `contexts/`。
+
+4. **查看与调试**
+   - 控制台会输出每个用例的得分、均值、最好/最差等统计。
+   - 开启 `--print-ongoing-status` 可实时查看插入 needle、生成 prompt 与模型响应摘要。
+
+5. **提交评测**
+   ```bash
+   python submit.py --agent your_module:YourAgentClass
+   ```
+   - 优先从命令行读取 `--api-key` / `--base-url`，否则回退到 `.env`。
+   - 提交脚本会校验 `STUDENT_ID`、`STUDENT_NAME`、`STUDENT_NICKNAME`、`MAIN_CONTRIBUTOR` 等信息。
+
+## 结果与输出
+- `results/*.json`：保存模型回答、得分、运行时间、needle 信息等。
+- `contexts/*.txt`（可选）：保存插入 needle 后的上下文，便于复现。
+- 控制台日志：汇总各测试用例及全局统计。
+
+## 开发建议
+- 优化检索策略：结合关键词召回、向量检索或 RAG，定位 needle 所在段落。
+- 控制上下文长度：利用 `encode_text_to_tokens` / `decode_tokens` 精确截断，确保请求不超限。
+- 调试评测器：`string` 模式可快速验证逻辑，`llm` 模式能提供更细粒度语义评分。
+
+如需更多背景与评分细节，请参阅 `Assignment5.md`。祝你取得好成绩！

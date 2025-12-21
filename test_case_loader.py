@@ -4,40 +4,39 @@ from typing import Dict, List, Union
 
 def load_test_cases(json_path: str) -> List[Dict]:
     """
-    Load test cases from JSON file.
-    Supports both single test case and multiple test cases format.
+    从 JSON 文件加载测试用例，兼容单个或多个用例格式。
 
     Args:
-        json_path: Path to JSON file containing test case(s)
+        json_path: 含测试用例的 JSON 路径
 
     Returns:
-        List of test case dictionaries, each containing 'needle', 'question', and 'ground_truth'
+        包含 'needle'、'question'、'ground_truth' 的测试用例列表
     """
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # Check if it's a single test case or multiple test cases
+    # 判断是单个用例还是多个用例
     if isinstance(data, list):
-        # Multiple test cases format
+        # 多个测试用例
         test_cases = data
     elif isinstance(data, dict):
-        # Check if it's a wrapper with 'test_cases' key
+        # 检查是否为带 test_cases 的包装格式
         if 'test_cases' in data:
             test_cases = data['test_cases']
         else:
-            # Single test case format
+            # 单个测试用例
             test_cases = [data]
     else:
         raise ValueError("Invalid JSON format: expected dict or list")
 
-    # Validate all test cases
+    # 校验所有测试用例
     required_fields = ['needle', 'question', 'ground_truth']
     for idx, test_case in enumerate(test_cases):
         for field in required_fields:
             if field not in test_case:
                 raise ValueError(f"Test case {idx}: Missing required field '{field}'")
 
-        # Add test case ID if not present
+        # 若缺失则补充测试用例 ID
         if 'id' not in test_case:
             test_case['id'] = idx + 1
 
@@ -46,13 +45,13 @@ def load_test_cases(json_path: str) -> List[Dict]:
 
 def load_test_case(json_path: str) -> Dict:
     """
-    Load single test case from JSON file (backward compatibility).
+    仅加载单个测试用例（向后兼容）。
 
     Args:
-        json_path: Path to JSON file containing test case
+        json_path: 含测试用例的 JSON 路径
 
     Returns:
-        Dict containing 'needle', 'question', and 'ground_truth'
+        包含 'needle'、'question'、'ground_truth' 的字典
     """
     test_cases = load_test_cases(json_path)
     if len(test_cases) != 1:
@@ -62,13 +61,13 @@ def load_test_case(json_path: str) -> Dict:
 
 def is_multi_needle(test_case: Dict) -> bool:
     """
-    Determine if test case is multi-needle based on needle field.
+    根据 needle 字段判断是否为多 needle 用例。
 
     Args:
-        test_case: Test case dictionary
+        test_case: 测试用例字典
 
     Returns:
-        True if multi-needle, False otherwise
+        多 needle 返回 True，否则 False
     """
     needle = test_case['needle']
     return isinstance(needle, list) and len(needle) > 1
@@ -76,13 +75,13 @@ def is_multi_needle(test_case: Dict) -> bool:
 
 def get_needles(test_case: Dict) -> List[str]:
     """
-    Extract needles from test case.
+    从测试用例中提取 needle。
 
     Args:
-        test_case: Test case dictionary
+        test_case: 测试用例字典
 
     Returns:
-        List of needle strings
+        needle 字符串列表
     """
     needle = test_case['needle']
     if isinstance(needle, list):

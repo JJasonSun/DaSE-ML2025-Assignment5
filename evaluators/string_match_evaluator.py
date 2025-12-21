@@ -3,23 +3,23 @@ from .evaluator import Evaluator
 
 
 class StringMatchEvaluator(Evaluator):
-    """Evaluator that uses exact string matching to score responses."""
+    """通过精确字符串匹配打分的评测器。"""
 
     CRITERIA: Dict[str, str] = {
         "exact_match": """
-Score 0: The answer does not match the ground truth.
-Score 1: The answer exactly matches the ground truth.
+得分 0：回答与标准答案不匹配。
+得分 1：回答与标准答案完全一致。
 """
     }
 
     def __init__(self, ground_truth: str, case_sensitive: bool = False, strip_whitespace: bool = True):
         """
-        Initialize the string match evaluator.
+        初始化字符串匹配评测器。
 
         Args:
-            ground_truth: The expected correct answer
-            case_sensitive: Whether to perform case-sensitive matching (default: False)
-            strip_whitespace: Whether to strip leading/trailing whitespace before comparison (default: True)
+            ground_truth: 预期正确答案
+            case_sensitive: 是否区分大小写（默认 False）
+            strip_whitespace: 是否在比较前去除首尾空白（默认 True）
         """
         self.ground_truth = ground_truth
         self.case_sensitive = case_sensitive
@@ -27,29 +27,29 @@ Score 1: The answer exactly matches the ground truth.
 
     def evaluate_response(self, response: str) -> int:
         """
-        Evaluate a response using exact string matching.
+        使用精确匹配评估回答。
 
         Args:
-            response: The response to evaluate
+            response: 待评估的回答
 
         Returns:
-            1 if the response matches the ground truth, 0 otherwise
+            匹配返回 1，否则返回 0
         """
-        # Prepare strings for comparison
+        # 准备待比较的字符串
         ground_truth = self.ground_truth
         response_to_check = response
 
-        # Strip whitespace if requested
+        # 需要时移除首尾空白
         if self.strip_whitespace:
             ground_truth = ground_truth.strip()
             response_to_check = response_to_check.strip()
 
-        # Convert to lowercase if case-insensitive
+        # 不区分大小写时统一转为小写
         if not self.case_sensitive:
             ground_truth = ground_truth.lower()
             response_to_check = response_to_check.lower()
 
-        # Perform exact match
+        # 执行精确匹配
         if response_to_check == ground_truth:
             return 1
         else:
