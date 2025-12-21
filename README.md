@@ -15,9 +15,10 @@
    STUDENT_NAME=姓名
    STUDENT_NICKNAME=昵称（排行榜显示）
    MAIN_CONTRIBUTOR=human   # 或 ai
-   TEST_MODEL=用于 check_api 的模型名称（可选）
+   MODEL_NAME=模型名称（如 ecnu-max, glm-4.5 等）
+   ENABLE_THINK=false       # 是否启用深度思考模式（默认为 false）
    ```
-3. 可运行 `python check_api.py` 验证 API_KEY 与 BASE_URL 是否可用；若设置了 TEST_MODEL 会顺便做一次推理测试。
+3. 可运行 `python check_api.py` 验证 API_KEY 与 BASE_URL 是否可用；若设置了 MODEL_NAME 会顺便做一次推理测试。
 
 ## 目录速览与文件作用
 
@@ -95,7 +96,18 @@
 
 选择建议：若需快速批量验证用 `--evaluator_type string`；若想评估语义等价或更接近人工判断可选 `--evaluator_type llm`。若评估多文档检索稳健性选 `--test_mode multi`，做可控变量扫描时选 `--test_mode single`。
 
-4. **查看与调试**
+4. **提交作业**
+
+   使用 `submit.py` 脚本提交你的 Agent 实现。请确保提供完整的模块路径：
+
+   ```bash
+   # 示例：提交 agents 目录下的 sync_agent.py 中的 SyncRetrievalAgent 类
+   python submit.py --agent agents.sync_agent:SyncRetrievalAgent
+   ```
+
+   提交成功后，你的 Agent 将在服务器端进行正式评测。
+
+## 查看与调试
 
    - 控制台会输出每个用例的得分、均值、最好/最差等统计。
    - 开启 `--print_ongoing_status` 可实时查看插入 needle、生成 prompt 与模型响应摘要。
