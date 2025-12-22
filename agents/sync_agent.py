@@ -29,8 +29,37 @@ class SyncRetrievalAgent(ModelProvider):
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         
         self.tokenizer = tiktoken.encoding_for_model("gpt-4") # 使用 GPT-4 的编码器
-        self.max_tokens_per_request = 16000  # 显著增加上下文长度以提高召回率
-        self.top_k_files = 15  # 增加检索文件数量以覆盖更多可能性
+        self.max_tokens_per_request = 32000  # 进一步增加上下文长度以提高召回率
+        self.top_k_files = 20  # 增加检索文件数量以覆盖更多可能性
+        
+        # 加载增强提示词
+        self.prompts = self._load_prompts()
+
+    def _load_prompts(self) -> Dict[str, str]:
+        """从 JSON 文件加载提示词，如果失败则使用默认值。"""
+        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'agent_prompts.json')
+        try:
+            if os.path.exists(prompt_path):
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        
+        # 默认提示词 (兜底)
+        return {
+            "system_prompt": (
+                "You are a very strong reasoner and planner. Use these critical instructions to structure your plans, thoughts, and responses.\n\n"
+                "Before taking any action, you must proactively, methodically, and independently plan and reason about:\n"
+                "1. **Logical dependencies and constraints**: Analyze the question against the provided snippets.\n"
+                "2. **Abductive reasoning and hypothesis exploration**: Perform semantic mapping if direct match is missing.\n"
+                "3. **Risk assessment**: Avoid hallucinations. The 'needle' is guaranteed to exist.\n"
+                "4. **Precision and Grounding**: Ensure reasoning is precise and relevant to snippets.\n"
+                "5. **Persistence and patience**: Do not give up. Re-scan context if needed.\n\n"
+                "### OUTPUT FORMAT:\n"
+                "Return ONLY a valid JSON object: {\"answer\": \"...\"}."
+            ),
+            "user_prompt_template": "Context:\n{context}\n\nQuestion: {question}\n\nReturn your answer in JSON format: {{\"answer\": \"...\"}}"
+        }
 
     async def _create_chat_completion(self,
                                       messages: List[Dict],
@@ -61,7 +90,7 @@ class SyncRetrievalAgent(ModelProvider):
                 params["extra_body"] = {
                     "thinking": {
                         "type": "enabled",
-                        "budget_tokens": 512 # 进一步压缩思维链长度以提升速度
+                        "budget_tokens": 1024 # 进一步压缩思维链长度以提升速度
                     }
                 }
 
@@ -96,11 +125,17 @@ class SyncRetrievalAgent(ModelProvider):
             # 2. 优先获取常规 content (对于 JSON 模式，答案在这里)
             content = message.get('content', '')
             if isinstance(content, str) and content.strip():
+                # 额外处理：有些模型会将思考内容放在 content 中并用特定标签包裹
+                clean_content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+                if clean_content:
+                    return clean_content
                 return content.strip()
             
-            # 3. 如果 content 为空但有 reasoning，则返回 reasoning (兜底)
+            # 3. 如果 content 为空但有 reasoning，说明模型可能还没输出结果就中断了
             if isinstance(reasoning, str) and reasoning.strip():
-                return reasoning.strip()
+                # 不直接返回 reasoning，因为那不是答案，返回空字符串以触发备用策略
+                print(f"Warning: Model provided reasoning but no content. Finish reason: {choice.get('finish_reason')}")
+                return ""
             
             # 4. 检查是否有工具调用
             tool_calls = message.get('tool_calls')
@@ -130,21 +165,20 @@ class SyncRetrievalAgent(ModelProvider):
             
             if not selected_content or selected_content == "No relevant content found.":
                 return "No relevant content found"
+            
+            # 调试：打印检索到的内容长度和前 200 字符
+            print(f"Debug: Selected content length: {len(selected_content)} chars")
+            if len(selected_content) > 0:
+                # 检查 needle 是否在 selected_content 中 (仅用于调试)
+                # 注意：我们不能读取原始文件，但我们可以检查 selected_content 是否包含问题中的关键编码
+                keywords = self._get_keywords(question)
+                found_kws = [kw for kw in keywords if kw.lower() in selected_content.lower()]
+                print(f"Debug: Found {len(found_kws)}/{len(keywords)} keywords in selected content")
 
-            # 构造消息
-            system_prompt = (
-                "You are a highly capable retrieval assistant. Your task is to find the 'needle' (specific information) "
-                "hidden within the provided 'haystack' (context) and answer the question accurately.\n"
-                "Rules:\n"
-                "1. The information you need IS present in the context. Look very carefully.\n"
-                "2. Answer based STRICTLY on the provided context. Do not use outside knowledge.\n"
-                "3. For date/day reasoning, use the reference dates provided in the context.\n"
-                "4. Be extremely concise. Provide ONLY the final answer.\n"
-                "5. Use Arabic numerals for numbers.\n"
-                "6. Return the result in JSON format with one key: 'answer'."
-            )
-
-            user_content = f"Context:\n{selected_content}\n\nQuestion: {question}\n\nReturn your answer in JSON format: {{\"answer\": \"...\"}}"
+            # 使用加载的增强提示词
+            system_prompt = self.prompts.get("system_prompt")
+            user_template = self.prompts.get("user_prompt_template")
+            user_content = user_template.format(context=selected_content, question=question)
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -155,8 +189,8 @@ class SyncRetrievalAgent(ModelProvider):
             response_raw = await self._create_chat_completion(
                 messages=messages,
                 temperature=0,
-                max_tokens=1000, 
-                timeout=60,
+                max_tokens=8000, # 进一步增加 max_tokens 以容纳超长思考
+                timeout=90,      # 增加超时时间
                 response_format={"type": "json_object"}
             )
             
@@ -184,15 +218,19 @@ class SyncRetrievalAgent(ModelProvider):
 
             # 如果响应为空或包含错误信息，尝试备用策略
             if not response or response.strip() == "" or "error" in response.lower() or "empty" in response.lower() or "cannot generate" in response.lower():
-                # 尝试更简单的prompt
+                # 尝试更严谨的备用 prompt
                 backup_messages = [
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant. Find the answer in the text and return it in JSON format: {\"answer\": \"...\"}."
+                        "content": (
+                            "Expert Retrieval Mode: Locate the 'needle' in the provided snippets. "
+                            "The information IS present. Scan methodically. "
+                            "Return ONLY a JSON object: {\"answer\": \"...\"}"
+                        )
                     },
                     {
                         "role": "user",
-                        "content": f"Reference Information:\n{selected_content}\n\nQuestion: {question}"
+                        "content": f"Snippets:\n{selected_content}\n\nTarget Question: {question}"
                     }
                 ]
                 backup_raw = await self._create_chat_completion(
@@ -359,15 +397,18 @@ class SyncRetrievalAgent(ModelProvider):
         keywords.extend([w for w in words if w not in stop_words and len(w) > 2])
         
         # 去重并限制数量
-        return list(dict.fromkeys(keywords))[:15]
+        return list(dict.fromkeys(keywords))[:20]
 
     def _extract_relevant_content(self, content: str, keywords: List[str], question: str) -> str:
         """
         使用多种策略提取最相关的内容。
         """
+        # 如果内容本身不长，直接返回全文以保证完整性
+        if len(self.encode_text_to_tokens(content)) < 1500:
+            return content
+
         # 策略 1：找到包含关键词的句子
         # 改进的句子切分：避免在日期（2024.01.01）或常见缩写处切断
-        # 注意：Python re 不支持变长 look-behind，因此我们将不同长度的缩写分开处理
         abbr_2 = r'Mr|Ms|Dr|vs|St|Rd|Co'
         abbr_3 = r'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mrs|Ave|Inc|Ltd|Vol'
         sentence_endings = rf'(?<!\b(?:{abbr_2}))(?<!\b(?:{abbr_3}))\.(?!\d)|[.!?]+'
@@ -375,65 +416,53 @@ class SyncRetrievalAgent(ModelProvider):
         try:
             sentences = re.split(sentence_endings, content)
         except Exception:
-            # 兜底方案：如果正则失败，使用简单切分
             sentences = re.split(r'[.!?]+', content)
             
         scored_sentences = []
         
         for sentence in sentences:
             sentence = sentence.strip()
-            if len(sentence) < 10:  # 跳过过短的句子
+            if len(sentence) < 10:
                 continue
                 
             sentence_lower = sentence.lower()
             score = 0
             
-            # 根据关键词出现次数得分
             for keyword in keywords:
                 kw_lower = keyword.lower()
                 if kw_lower in sentence_lower:
-                    # 精确词边界额外加分
                     if re.search(r'\b' + re.escape(kw_lower) + r'\b', sentence_lower):
-                        score += 5 # 增加权重
+                        score += 10 # 显著增加权重
                     else:
-                        score += 2
+                        score += 3
             
-            # 包含数字或日期给予加分
             if re.search(r'\b\d+\b', sentence):
                 score += 2
             
-            # 针对常见包含答案的模式再加分
             if re.search(r'\b(scheduled|date|day|week|days|between|from|to|on|in|at|reference|today|tomorrow|yesterday)\b', sentence_lower):
-                score += 3
+                score += 5
                 
             if score > 0:
                 scored_sentences.append((sentence, score))
         
-        # 策略 2：若无高分句子，回退到段落级
         if not scored_sentences:
             return self._get_best_chunk(content, keywords)
         
-        # 按得分排序并组合高分句子
         scored_sentences.sort(key=lambda x: x[1], reverse=True)
         
-        # 将高分句与上下文拼接
         result_sentences = []
         total_tokens = 0
-        # 动态分配每个文件的 token 预算
-        max_tokens_per_file = self.max_tokens_per_request // 4 
+        max_tokens_per_file = self.max_tokens_per_request // 3 # 增加单文件预算
         
-        for sentence, score in scored_sentences[:20]:  # 进一步增加候选句子数量
+        for sentence, score in scored_sentences[:30]: # 增加候选
             sentence_tokens = len(self.encode_text_to_tokens(sentence))
             if total_tokens + sentence_tokens > max_tokens_per_file:
                 break
             result_sentences.append(sentence)
             total_tokens += sentence_tokens
         
-        # 若已找到较优句子，补充上下文
         if result_sentences:
-            # 查找原文位置并加入周边内容
             result_with_context = []
-            # 按照在原文中出现的顺序排序，保持逻辑连贯
             sorted_sentences = []
             for s in result_sentences:
                 pos = content.find(s)
@@ -441,15 +470,17 @@ class SyncRetrievalAgent(ModelProvider):
                     sorted_sentences.append((s, pos))
             sorted_sentences.sort(key=lambda x: x[1])
 
-            for target_sentence, sentence_pos in sorted_sentences[:10]: # 增加到 10 个片段
-                # 获取前后一定范围的上下文 (增加到 500 字符)
-                start = max(0, sentence_pos - 500)
-                end = min(len(content), sentence_pos + len(target_sentence) + 500)
+            for target_sentence, sentence_pos in sorted_sentences[:15]: # 增加片段数量
+                # 扩大上下文范围到 800 字符
+                start = max(0, sentence_pos - 800)
+                end = min(len(content), sentence_pos + len(target_sentence) + 800)
                 context_chunk = content[start:end].strip()
                 if context_chunk not in result_with_context:
                     result_with_context.append(context_chunk)
             
-            return '\n\n'.join(result_with_context)
+            return '\n\n... [SNIPPET] ...\n\n'.join(result_with_context)
+        
+        return self._get_best_chunk(content, keywords)
         
         return self._get_best_chunk(content, keywords)
         
