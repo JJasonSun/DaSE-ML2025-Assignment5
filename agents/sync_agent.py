@@ -1,6 +1,11 @@
+import json
+import os
+import asyncio
 from typing import List, Dict, Optional
 import tiktoken
 import re
+from openai import OpenAI
+from dotenv import load_dotenv
 from model import ModelProvider
 
 class SyncRetrievalAgent(ModelProvider):
@@ -17,10 +22,97 @@ class SyncRetrievalAgent(ModelProvider):
     """
 
     def __init__(self, api_key: str, base_url: str):
-        super().__init__(api_key, base_url)
+        self.api_key = api_key
+        self.base_url = base_url.rstrip('/')
+        load_dotenv()
+        self.model_name = os.getenv('MODEL_NAME', 'glm-4.5')
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        
         self.tokenizer = tiktoken.encoding_for_model("gpt-4") # 使用 GPT-4 的编码器
-        self.max_tokens_per_request = 512  # 提高上限以覆盖更多上下文
-        self.top_k_files = 5  # 从 3 提升至 5
+        self.max_tokens_per_request = 16000  # 显著增加上下文长度以提高召回率
+        self.top_k_files = 15  # 增加检索文件数量以覆盖更多可能性
+
+    async def _create_chat_completion(self,
+                                      messages: List[Dict],
+                                      temperature: float = 0,
+                                      max_tokens: int = 500,
+                                      timeout: int = 20,
+                                      **kwargs) -> str:
+        """在异步上下文中用 OpenAI 客户端调用 ChatCompletion 并返回文本。"""
+        def _sync_call():
+            # 从环境变量获取是否启用思考模式，默认为 false
+            enable_think = os.getenv('ENABLE_THINK', 'false').lower() == 'true'
+            
+            # 只有 ecnu-max 和 ecnu-plus 不支持 thinking 参数
+            unsupported_models = ['ecnu-max', 'ecnu-plus']
+            supports_thinking = not any(m in self.model_name.lower() for m in unsupported_models)
+            
+            params = {
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "timeout": timeout,
+                **kwargs
+            }
+
+            # 如果启用了思考模式且模型支持，添加 extra_body
+            if enable_think and supports_thinking:
+                params["extra_body"] = {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 512 # 进一步压缩思维链长度以提升速度
+                    }
+                }
+
+            return self.client.chat.completions.create(**params)
+
+        try:
+            try:
+                completion = await asyncio.to_thread(_sync_call)
+            except AttributeError:
+                loop = asyncio.get_running_loop()
+                completion = await loop.run_in_executor(None, _sync_call)
+
+            raw = completion.to_dict()
+            print(f"Debug: Raw response: {raw}") # 调试输出完整响应
+            return self._extract_content_from_response(raw)
+        except Exception as exc:
+            return f"API error: {exc}" if exc else "API error"
+
+    def _extract_content_from_response(self, result: dict) -> str:
+        """
+        从API响应中提取内容，兼容多种格式。
+        """
+        try:
+            choice = result.get('choices', [{}])[0]
+            message = choice.get('message', {})
+            
+            # 1. 检查是否有 native reasoning_content 并打印
+            reasoning = message.get('reasoning_content', '')
+            if isinstance(reasoning, str) and reasoning.strip():
+                print(f"Debug: Native Reasoning Content: {reasoning.strip()}")
+            
+            # 2. 优先获取常规 content (对于 JSON 模式，答案在这里)
+            content = message.get('content', '')
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+            
+            # 3. 如果 content 为空但有 reasoning，则返回 reasoning (兜底)
+            if isinstance(reasoning, str) and reasoning.strip():
+                return reasoning.strip()
+            
+            # 4. 检查是否有工具调用
+            tool_calls = message.get('tool_calls')
+            if tool_calls:
+                return f"Tool calls detected: {tool_calls}"
+            
+            # 4. 返回finish_reason信息
+            finish_reason = choice.get('finish_reason', 'unknown')
+            return f"Empty response (finish_reason: {finish_reason})"
+            
+        except Exception as e:
+            return f"Response parsing error: {str(e)[:50]}"
 
     async def evaluate_model(self, prompt: Dict) -> str:
         """
@@ -31,75 +123,130 @@ class SyncRetrievalAgent(ModelProvider):
             question = prompt.get('question', '')
             
             if not context_data or not question:
-                return "缺少必要的输入数据"
+                return "Missing required input data"
 
             # 提取相关内容
             selected_content = self._retrieve_content(context_data, question)
             
             if not selected_content or selected_content == "No relevant content found.":
-                return "未找到相关内容"
+                return "No relevant content found"
 
             # 构造消息
+            system_prompt = (
+                "You are a highly capable retrieval assistant. Your task is to find the 'needle' (specific information) "
+                "hidden within the provided 'haystack' (context) and answer the question accurately.\n"
+                "Rules:\n"
+                "1. The information you need IS present in the context. Look very carefully.\n"
+                "2. Answer based STRICTLY on the provided context. Do not use outside knowledge.\n"
+                "3. For date/day reasoning, use the reference dates provided in the context.\n"
+                "4. Be extremely concise. Provide ONLY the final answer.\n"
+                "5. Use Arabic numerals for numbers.\n"
+                "6. Return the result in JSON format with one key: 'answer'."
+            )
+
+            user_content = f"Context:\n{selected_content}\n\nQuestion: {question}\n\nReturn your answer in JSON format: {{\"answer\": \"...\"}}"
+
             messages = [
-                {
-                    "role": "system",
-                    "content": "你是一位严谨且高效的问答助手。以下规则必须同时满足：\n1. 准确提取上下文信息。如果问题涉及日期计算或星期推算，请基于上下文中的日期进行推导。\n2. 不要输出多余文字，只提供最终答案。\n3. 处理日期/星期时，请返回英文格式（例：Thursday, December 25, 2031）。\n4. 数字类问题请直接给出阿拉伯数字。\n5. 如果无法判断答案，返回“无法生成有效回答”。\n6. 最终答案必须使用英文表达。"
-                },
-                {
-                    "role": "user",
-                    "content": f"根据以下上下文直接回答问题，不需要说明过程。\n\n上下文内容：\n{selected_content}\n\n问题：{question}\n\n请直接写出答案："
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
             ]
 
-            # 使用基类的API调用方法，增加 max_tokens 以应对推理模型
-            response = await self._create_chat_completion(
+            # 使用基类的API调用方法，优化参数
+            response_raw = await self._create_chat_completion(
                 messages=messages,
                 temperature=0,
-                max_tokens=1500,
-                timeout=30
+                max_tokens=1000, 
+                timeout=60,
+                response_format={"type": "json_object"}
             )
             
+            # 解析 JSON 响应
+            response = ""
+            try:
+                # 1. 预处理：剥离可能存在的 Markdown 代码块
+                clean_raw = response_raw.strip()
+                if "```" in clean_raw:
+                    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_raw, re.DOTALL)
+                    if json_match:
+                        clean_raw = json_match.group(1)
+                
+                # 2. 尝试解析 JSON
+                data = json.loads(clean_raw)
+                response = str(data.get("answer", ""))
+            except Exception:
+                # 3. 兜底：如果 JSON 解析失败，尝试用正则提取
+                # 尝试提取 answer 字段的值
+                json_match = re.search(r'\"answer\"\s*:\s*\"(.*?)\"', response_raw, re.DOTALL)
+                if json_match:
+                    response = json_match.group(1)
+                else:
+                    response = response_raw
+
             # 如果响应为空或包含错误信息，尝试备用策略
-            if not response or response.strip() == "" or "error" in response.lower() or "empty" in response.lower():
+            if not response or response.strip() == "" or "error" in response.lower() or "empty" in response.lower() or "cannot generate" in response.lower():
                 # 尝试更简单的prompt
                 backup_messages = [
                     {
                         "role": "system",
-                        "content": "你是一位只输出最终结果的中文助手。遇到无法确定时说“无法生成有效回答”。最终答案必须使用英文。"
+                        "content": "You are a helpful assistant. Find the answer in the text and return it in JSON format: {\"answer\": \"...\"}."
                     },
                     {
                         "role": "user",
-                        "content": f"请参考下面的信息，直接给出答案，不需要过程。\n\n{selected_content}\n\n问题：{question}\n\n答案："
+                        "content": f"Reference Information:\n{selected_content}\n\nQuestion: {question}"
                     }
                 ]
-                response = await self._create_chat_completion(
+                backup_raw = await self._create_chat_completion(
                     messages=backup_messages,
-                    temperature=0.1,
+                    temperature=0,
                     max_tokens=100,
-                    timeout=15
+                    timeout=15,
+                    response_format={"type": "json_object"}
                 )
+                try:
+                    # 同样对备用响应进行 Markdown 剥离
+                    clean_backup = backup_raw.strip()
+                    if "```" in clean_backup:
+                        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_backup, re.DOTALL)
+                        if json_match:
+                            clean_backup = json_match.group(1)
+                    data = json.loads(clean_backup)
+                    response = str(data.get("answer", ""))
+                except Exception:
+                    response = backup_raw
             
             # 最终检查和清理响应
             if response and response.strip():
                 cleaned_response = response.strip()
-                # 移除可能的前缀和后缀
-                prefixes_to_remove = ['答案：', 'Answer:', 'The answer is', 'Based on', 'According to']
-                for prefix in prefixes_to_remove:
-                    if cleaned_response.startswith(prefix):
-                        cleaned_response = cleaned_response[len(prefix):].strip()
-                        if cleaned_response.startswith(':'):
-                            cleaned_response = cleaned_response[1:].strip()
                 
-                # 移除句号等标点符号（如果答案是单个词）
-                if len(cleaned_response.split()) == 1:
+                # 移除可能的前缀（循环移除，直到没有匹配为止）
+                prefixes_to_remove = [
+                    'Answer:', 'The answer is', 'Based on', 'According to', 
+                    'Result:', 'Output:', 'Final Answer:', '答案：'
+                ]
+                
+                changed = True
+                while changed:
+                    changed = False
+                    for prefix in prefixes_to_remove:
+                        if cleaned_response.lower().startswith(prefix.lower()):
+                            cleaned_response = cleaned_response[len(prefix):].strip()
+                            if cleaned_response.startswith(':'):
+                                cleaned_response = cleaned_response[1:].strip()
+                            changed = True
+                
+                # 移除末尾的引号（有时 JSON 提取会残留）
+                cleaned_response = cleaned_response.strip('"\'')
+                
+                # 移除句号等标点符号（如果答案很短，通常是单个词或日期）
+                if len(cleaned_response.split()) <= 5:
                     cleaned_response = cleaned_response.rstrip('.,!?;')
                 
                 return cleaned_response
             else:
-                return "无法生成有效回答"
+                return "I cannot generate a valid answer."
                 
         except Exception as e:
-            return f"处理错误: {str(e)[:50]}"
+            return f"Error: {str(e)[:50]}"
 
     def _retrieve_content(self, context_data: Dict, question: str) -> str:
         """
@@ -158,7 +305,7 @@ class SyncRetrievalAgent(ModelProvider):
             content_tokens = len(self.encode_text_to_tokens(extracted_content))
             if total_tokens + content_tokens > self.max_tokens_per_request:
                 remaining = self.max_tokens_per_request - total_tokens
-                if remaining > 200:  # 仅在剩余空间足够时追加
+                if remaining > 500:  # 增加阈值
                     extracted_content = self._truncate_text(extracted_content, remaining)
                     content_parts.append(f"=== {filename} ===\n{extracted_content}")
                 break
@@ -200,8 +347,12 @@ class SyncRetrievalAgent(ModelProvider):
         keywords.extend(years)
         
         # 提取月份名称
-        months = re.findall(r'\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b', question.lower())
+        months = re.findall(r'\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b', question.lower())
         keywords.extend(months)
+
+        # 提取星期名称
+        days = re.findall(r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b', question.lower())
+        keywords.extend(days)
         
         # 提取常规单词（编码提取之后）
         words = re.findall(r'\b[a-zA-Z]+\b', question.lower())
@@ -215,7 +366,18 @@ class SyncRetrievalAgent(ModelProvider):
         使用多种策略提取最相关的内容。
         """
         # 策略 1：找到包含关键词的句子
-        sentences = re.split(r'[.!?]+', content)
+        # 改进的句子切分：避免在日期（2024.01.01）或常见缩写处切断
+        # 注意：Python re 不支持变长 look-behind，因此我们将不同长度的缩写分开处理
+        abbr_2 = r'Mr|Ms|Dr|vs|St|Rd|Co'
+        abbr_3 = r'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mrs|Ave|Inc|Ltd|Vol'
+        sentence_endings = rf'(?<!\b(?:{abbr_2}))(?<!\b(?:{abbr_3}))\.(?!\d)|[.!?]+'
+        
+        try:
+            sentences = re.split(sentence_endings, content)
+        except Exception:
+            # 兜底方案：如果正则失败，使用简单切分
+            sentences = re.split(r'[.!?]+', content)
+            
         scored_sentences = []
         
         for sentence in sentences:
@@ -232,17 +394,17 @@ class SyncRetrievalAgent(ModelProvider):
                 if kw_lower in sentence_lower:
                     # 精确词边界额外加分
                     if re.search(r'\b' + re.escape(kw_lower) + r'\b', sentence_lower):
-                        score += 3
+                        score += 5 # 增加权重
                     else:
-                        score += 1
+                        score += 2
             
             # 包含数字或日期给予加分
             if re.search(r'\b\d+\b', sentence):
-                score += 1
+                score += 2
             
             # 针对常见包含答案的模式再加分
-            if re.search(r'\b(scheduled|date|day|week|days|between|from|to|on|in)\b', sentence_lower):
-                score += 1
+            if re.search(r'\b(scheduled|date|day|week|days|between|from|to|on|in|at|reference|today|tomorrow|yesterday)\b', sentence_lower):
+                score += 3
                 
             if score > 0:
                 scored_sentences.append((sentence, score))
@@ -257,11 +419,12 @@ class SyncRetrievalAgent(ModelProvider):
         # 将高分句与上下文拼接
         result_sentences = []
         total_tokens = 0
-        max_tokens = self.max_tokens_per_request // 6  # 为多个文件预留空间
+        # 动态分配每个文件的 token 预算
+        max_tokens_per_file = self.max_tokens_per_request // 4 
         
-        for sentence, score in scored_sentences[:10]:  # 取前 10 个句子
+        for sentence, score in scored_sentences[:20]:  # 进一步增加候选句子数量
             sentence_tokens = len(self.encode_text_to_tokens(sentence))
-            if total_tokens + sentence_tokens > max_tokens:
+            if total_tokens + sentence_tokens > max_tokens_per_file:
                 break
             result_sentences.append(sentence)
             total_tokens += sentence_tokens
@@ -270,17 +433,25 @@ class SyncRetrievalAgent(ModelProvider):
         if result_sentences:
             # 查找原文位置并加入周边内容
             result_with_context = []
-            for target_sentence in result_sentences[:5]:  # 仅取前 5 个
-                # 在原文中定位句子并添加前后文
-                sentence_pos = content.find(target_sentence)
-                if sentence_pos != -1:
-                    # 获取前后一定范围的上下文
-                    start = max(0, sentence_pos - 200)
-                    end = min(len(content), sentence_pos + len(target_sentence) + 200)
-                    context_chunk = content[start:end].strip()
+            # 按照在原文中出现的顺序排序，保持逻辑连贯
+            sorted_sentences = []
+            for s in result_sentences:
+                pos = content.find(s)
+                if pos != -1:
+                    sorted_sentences.append((s, pos))
+            sorted_sentences.sort(key=lambda x: x[1])
+
+            for target_sentence, sentence_pos in sorted_sentences[:10]: # 增加到 10 个片段
+                # 获取前后一定范围的上下文 (增加到 500 字符)
+                start = max(0, sentence_pos - 500)
+                end = min(len(content), sentence_pos + len(target_sentence) + 500)
+                context_chunk = content[start:end].strip()
+                if context_chunk not in result_with_context:
                     result_with_context.append(context_chunk)
             
             return '\n\n'.join(result_with_context)
+        
+        return self._get_best_chunk(content, keywords)
         
         return '\n'.join(result_sentences)
 
@@ -309,7 +480,7 @@ class SyncRetrievalAgent(ModelProvider):
         
         result_paras = []
         total_tokens = 0
-        max_tokens = self.max_tokens_per_request // 6
+        max_tokens = self.max_tokens_per_request // 4
         
         for para, score in scored_paras:
             para_tokens = len(self.encode_text_to_tokens(para))

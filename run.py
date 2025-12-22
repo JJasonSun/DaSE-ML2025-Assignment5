@@ -108,12 +108,17 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
 
     # 根据类型初始化评测器
     if args.evaluator_type == 'llm':
+        # 优先从环境变量获取评测专用的 API 配置
+        eval_api_key = os.getenv('EVAL_API_KEY') or api_key
+        eval_base_url = os.getenv('EVAL_BASE_URL') or base_url
+        eval_model_name = os.getenv('EVAL_MODEL_NAME') or agent.model_name
+        
         evaluator = LLMEvaluator(
-            api_key=api_key,
-            base_url=base_url,
+            api_key=eval_api_key,
+            base_url=eval_base_url,
             ground_truth=test_case['ground_truth'],
             question=test_case['question'],
-            model_name=agent.model_name
+            model_name=eval_model_name
         )
     elif args.evaluator_type == 'string':
         evaluator = StringMatchEvaluator(
