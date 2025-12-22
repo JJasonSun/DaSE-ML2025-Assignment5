@@ -4,33 +4,45 @@ import asyncio
 from typing import List, Dict, Optional
 import tiktoken
 import re
+import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 from model import ModelProvider
 
-class SyncRetrievalAgent(ModelProvider):
+class AdvancedRetrievalAgent(ModelProvider):
     """
-    同步版多文档检索 Agent，避免 asyncio 问题。
-    使用基类的通用API调用方法，支持控制推理过程。
+    高级多文档检索 Agent。
+    集成 ecnu-embedding-small 和 ecnu-rerank 模型提升检索精度。
     
     提升准确率的优化点：
     1. 增强关键词提取（数字、日期、编码）
-    2. 更好的文件打分算法
-    3. 句子级内容抽取
-    4. 多策略组合搜索
-    5. 禁用推理模式获得直接答案
+    2. 初始关键词打分过滤文件
+    3. 句子级片段抽取
+    4. 使用 ecnu-rerank 对片段进行二次精排
+    5. 32K 超大上下文窗口
     """
 
-    def __init__(self, api_key: str, base_url: str):
-        self.api_key = api_key
-        self.base_url = base_url.rstrip('/')
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         load_dotenv()
-        self.model_name = os.getenv('MODEL_NAME', 'glm-4.5')
+        # 1. 主模型配置 (用于 LLM 生成)
+        # 优先使用传入参数，否则按 API_KEY -> ECNU_API_KEY 顺序获取
+        self.api_key = api_key or os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
+        self.base_url = (base_url or os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL')).rstrip('/')
+        self.model_name = os.getenv('MODEL_NAME', 'ecnu-max')
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+
+        # 2. ECNU 专用模型配置 (用于 Embedding 和 Rerank)
+        # 强制走 ECNU_API_KEY，避免主模型 provider (如 mimo) 不支持这些模型导致 404
+        self.ecnu_api_key = os.getenv('ECNU_API_KEY') or self.api_key
+        self.ecnu_base_url = os.getenv('ECNU_BASE_URL').rstrip('/')
+        self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
+        
+        self.embedding_model = "ecnu-embedding-small"
+        self.rerank_model = "ecnu-rerank"
         
         self.tokenizer = tiktoken.encoding_for_model("gpt-4") # 使用 GPT-4 的编码器
-        self.max_tokens_per_request = 32000  # 进一步增加上下文长度以提高召回率
-        self.top_k_files = 20  # 增加检索文件数量以覆盖更多可能性
+        self.max_tokens_per_request = 16000  # 有了 Rerank，16K 足以容纳高质量片段
+        self.top_k_files = 15  # 初始筛选文件数
         
         # 加载增强提示词
         self.prompts = self._load_prompts()
@@ -73,7 +85,7 @@ class SyncRetrievalAgent(ModelProvider):
             enable_think = os.getenv('ENABLE_THINK', 'false').lower() == 'true'
             
             # 只有 ecnu-max 和 ecnu-plus 不支持 thinking 参数
-            unsupported_models = ['ecnu-max', 'ecnu-plus']
+            unsupported_models = ['ecnu-max', 'ecnu-plus', 'ecnu-turbo']
             supports_thinking = not any(m in self.model_name.lower() for m in unsupported_models)
             
             params = {
@@ -85,14 +97,21 @@ class SyncRetrievalAgent(ModelProvider):
                 **kwargs
             }
 
-            # 如果启用了思考模式且模型支持，添加 extra_body
-            if enable_think and supports_thinking:
-                params["extra_body"] = {
-                    "thinking": {
+            # 如果模型支持 thinking 参数，根据环境变量显式开启或关闭
+            if supports_thinking:
+                if "extra_body" not in params:
+                    params["extra_body"] = {}
+                
+                if enable_think:
+                    params["extra_body"]["thinking"] = {
                         "type": "enabled",
                         "budget_tokens": 1024 # 进一步压缩思维链长度以提升速度
                     }
-                }
+                else:
+                    # 默认显式禁用，防止某些模型（如 GLM-4.5）在某些情况下自动开启
+                    params["extra_body"]["thinking"] = {
+                        "type": "disabled"
+                    }
 
             return self.client.chat.completions.create(**params)
 
@@ -117,9 +136,10 @@ class SyncRetrievalAgent(ModelProvider):
             choice = result.get('choices', [{}])[0]
             message = choice.get('message', {})
             
-            # 1. 检查是否有 native reasoning_content 并打印
+            # 1. 检查是否有 native reasoning_content 并打印 (仅在开启思考模式时显示)
             reasoning = message.get('reasoning_content', '')
-            if isinstance(reasoning, str) and reasoning.strip():
+            enable_think = os.getenv('ENABLE_THINK', 'false').lower() == 'true'
+            if isinstance(reasoning, str) and reasoning.strip() and enable_think:
                 print(f"Debug: Native Reasoning Content: {reasoning.strip()}")
             
             # 2. 优先获取常规 content (对于 JSON 模式，答案在这里)
@@ -286,72 +306,142 @@ class SyncRetrievalAgent(ModelProvider):
         except Exception as e:
             return f"Error: {str(e)[:50]}"
 
+    def _rerank_documents(self, query: str, documents: List[str], top_n: int = 10) -> List[str]:
+        """使用 ecnu-rerank 模型对文档进行重排序。"""
+        if not documents:
+            return []
+            
+        # 强制使用 ECNU 专用的 URL 和 Key
+        url = f"{self.ecnu_base_url}/rerank"
+        headers = {
+            "Authorization": f"Bearer {self.ecnu_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.rerank_model,
+            "query": query,
+            "documents": documents,
+            "top_n": top_n,
+            "return_documents": True
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            # 提取重排后的文档内容
+            results = result.get('results', [])
+            if not results:
+                return documents[:top_n]
+            
+            reranked_docs = [item['document'] for item in results]
+            return reranked_docs
+        except Exception as e:
+            print(f"Error during reranking: {e}")
+            # 如果重排失败，返回原始文档的前 top_n 个
+            return documents[:top_n]
+
     def _retrieve_content(self, context_data: Dict, question: str) -> str:
         """
-        使用改进的打分与抽取策略获取更相关的内容。
+        使用关键词初步筛选 + Rerank 精排的策略获取内容。
         """
         files = context_data['files']
-        
-        # 提取关键词
         keywords = self._get_keywords(question)
         
-        # 通过强化评分寻找相关文件
+        # 1. 关键词初步筛选文件
         relevant_files = []
         for file_data in files:
             filename = file_data['filename']
             content = file_data['modified_content']
             content_lower = content.lower()
             
-            # 多重评分因素
-            keyword_matches = 0
-            exact_matches = 0
-            
-            for keyword in keywords:
-                kw_lower = keyword.lower()
-                # 统计出现次数
-                keyword_matches += content_lower.count(kw_lower)
-                # 精确词边界给予额外加成
-                if re.search(r'\b' + re.escape(kw_lower) + r'\b', content_lower):
-                    exact_matches += 1
-            
-            if keyword_matches > 0 or exact_matches > 0:
-                # 综合得分：关键词密度 + 精确匹配加分
-                content_length = len(content.split())
-                density_score = keyword_matches / max(content_length, 1) * 1000
-                exact_bonus = exact_matches * 100
-                final_score = density_score + exact_bonus
-                
-                relevant_files.append((filename, final_score, file_data))
+            keyword_matches = sum(content_lower.count(kw.lower()) for kw in keywords)
+            if keyword_matches > 0:
+                relevant_files.append((filename, keyword_matches, file_data))
         
-        # 按相关性排序并选取前若干文件
         relevant_files.sort(key=lambda x: x[1], reverse=True)
         
-        # 从高相关文件中提取内容
+        # 2. 从高相关文件中提取候选片段
+        all_candidate_snippets = []
+        for filename, score, file_data in relevant_files[:self.top_k_files]:
+            content = file_data['modified_content']
+            snippets = self._extract_relevant_snippets(content, keywords)
+            for s in snippets:
+                # 给片段加上文件名标识，方便模型定位
+                all_candidate_snippets.append(f"[{filename}] {s}")
+        
+        if not all_candidate_snippets:
+            return "No relevant content found."
+
+        # 3. 使用 ecnu-rerank 对所有片段进行精排
+        # 由于 rerank 接口可能有文档数量限制，我们取前 50 个最相关的片段进行重排
+        # 这里的“最相关”先按关键词简单过滤
+        top_candidates = all_candidate_snippets[:50]
+        reranked_snippets = self._rerank_documents(question, top_candidates, top_n=20)
+        
+        # 4. 组合最终上下文，确保不超过 token 限制
         content_parts = []
         total_tokens = 0
         
-        for filename, score, file_data in relevant_files[:self.top_k_files]:
-            if total_tokens >= self.max_tokens_per_request:
+        for snippet in reranked_snippets:
+            snippet_tokens = len(self.encode_text_to_tokens(snippet))
+            if total_tokens + snippet_tokens > self.max_tokens_per_request:
                 break
-                
-            content = file_data['modified_content']
+            content_parts.append(snippet)
+            total_tokens += snippet_tokens
             
-            # 获取该文件中最相关的片段
-            extracted_content = self._extract_relevant_content(content, keywords, question)
-            
-            # 检查 token 上限
-            content_tokens = len(self.encode_text_to_tokens(extracted_content))
-            if total_tokens + content_tokens > self.max_tokens_per_request:
-                remaining = self.max_tokens_per_request - total_tokens
-                if remaining > 500:  # 增加阈值
-                    extracted_content = self._truncate_text(extracted_content, remaining)
-                    content_parts.append(f"=== {filename} ===\n{extracted_content}")
-                break
-            else:
-                content_parts.append(f"=== {filename} ===\n{extracted_content}")
-                total_tokens += content_tokens
+        return "\n\n---\n\n".join(content_parts)
+
+    def _extract_relevant_snippets(self, content: str, keywords: List[str]) -> List[str]:
+        """提取包含关键词的候选片段。"""
+        # 改进的句子切分
+        abbr_2 = r'Mr|Ms|Dr|vs|St|Rd|Co'
+        abbr_3 = r'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mrs|Ave|Inc|Ltd|Vol'
+        sentence_endings = rf'(?<!\b(?:{abbr_2}))(?<!\b(?:{abbr_3}))\.(?!\d)|[.!?]+'
         
-        return "\n\n".join(content_parts) if content_parts else "No relevant content found."
+        try:
+            sentences = re.split(sentence_endings, content)
+        except Exception:
+            sentences = re.split(r'[.!?]+', content)
+            
+        scored_sentences = []
+        for i, sentence in enumerate(sentences):
+            sentence = sentence.strip()
+            if len(sentence) < 10: continue
+            
+            score = sum(10 if re.search(r'\b' + re.escape(kw.lower()) + r'\b', sentence.lower()) else 0 for kw in keywords)
+            if score > 0:
+                scored_sentences.append((i, sentence, score))
+        
+        if not scored_sentences:
+            return [content[:1000]] # 兜底
+            
+        scored_sentences.sort(key=lambda x: x[2], reverse=True)
+        
+        snippets = []
+        seen_ranges = []
+        
+        for idx, sentence, score in scored_sentences[:15]:
+            # 找到句子在原文中的位置
+            pos = content.find(sentence)
+            if pos == -1: continue
+            
+            # 扩大上下文范围
+            start = max(0, pos - 800)
+            end = min(len(content), pos + len(sentence) + 800)
+            
+            # 检查是否重叠
+            is_overlap = False
+            for r_start, r_end in seen_ranges:
+                if not (end < r_start or start > r_end):
+                    is_overlap = True
+                    break
+            
+            if not is_overlap:
+                snippets.append(content[start:end].strip())
+                seen_ranges.append((start, end))
+                
+        return snippets
 
     def _get_keywords(self, question: str) -> List[str]:
         """增强关键词提取，包含数字、日期和编码。"""
@@ -399,128 +489,18 @@ class SyncRetrievalAgent(ModelProvider):
         # 去重并限制数量
         return list(dict.fromkeys(keywords))[:20]
 
-    def _extract_relevant_content(self, content: str, keywords: List[str], question: str) -> str:
-        """
-        使用多种策略提取最相关的内容。
-        """
-        # 如果内容本身不长，直接返回全文以保证完整性
-        if len(self.encode_text_to_tokens(content)) < 1500:
-            return content
-
-        # 策略 1：找到包含关键词的句子
-        # 改进的句子切分：避免在日期（2024.01.01）或常见缩写处切断
-        abbr_2 = r'Mr|Ms|Dr|vs|St|Rd|Co'
-        abbr_3 = r'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mrs|Ave|Inc|Ltd|Vol'
-        sentence_endings = rf'(?<!\b(?:{abbr_2}))(?<!\b(?:{abbr_3}))\.(?!\d)|[.!?]+'
-        
+    def _get_embeddings(self, text: str) -> List[float]:
+        """使用 ecnu-embedding-small 获取文本向量。"""
         try:
-            sentences = re.split(sentence_endings, content)
-        except Exception:
-            sentences = re.split(r'[.!?]+', content)
-            
-        scored_sentences = []
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if len(sentence) < 10:
-                continue
-                
-            sentence_lower = sentence.lower()
-            score = 0
-            
-            for keyword in keywords:
-                kw_lower = keyword.lower()
-                if kw_lower in sentence_lower:
-                    if re.search(r'\b' + re.escape(kw_lower) + r'\b', sentence_lower):
-                        score += 10 # 显著增加权重
-                    else:
-                        score += 3
-            
-            if re.search(r'\b\d+\b', sentence):
-                score += 2
-            
-            if re.search(r'\b(scheduled|date|day|week|days|between|from|to|on|in|at|reference|today|tomorrow|yesterday)\b', sentence_lower):
-                score += 5
-                
-            if score > 0:
-                scored_sentences.append((sentence, score))
-        
-        if not scored_sentences:
-            return self._get_best_chunk(content, keywords)
-        
-        scored_sentences.sort(key=lambda x: x[1], reverse=True)
-        
-        result_sentences = []
-        total_tokens = 0
-        max_tokens_per_file = self.max_tokens_per_request // 3 # 增加单文件预算
-        
-        for sentence, score in scored_sentences[:30]: # 增加候选
-            sentence_tokens = len(self.encode_text_to_tokens(sentence))
-            if total_tokens + sentence_tokens > max_tokens_per_file:
-                break
-            result_sentences.append(sentence)
-            total_tokens += sentence_tokens
-        
-        if result_sentences:
-            result_with_context = []
-            sorted_sentences = []
-            for s in result_sentences:
-                pos = content.find(s)
-                if pos != -1:
-                    sorted_sentences.append((s, pos))
-            sorted_sentences.sort(key=lambda x: x[1])
-
-            for target_sentence, sentence_pos in sorted_sentences[:15]: # 增加片段数量
-                # 扩大上下文范围到 800 字符
-                start = max(0, sentence_pos - 800)
-                end = min(len(content), sentence_pos + len(target_sentence) + 800)
-                context_chunk = content[start:end].strip()
-                if context_chunk not in result_with_context:
-                    result_with_context.append(context_chunk)
-            
-            return '\n\n... [SNIPPET] ...\n\n'.join(result_with_context)
-        
-        return self._get_best_chunk(content, keywords)
-        
-        return self._get_best_chunk(content, keywords)
-        
-        return '\n'.join(result_sentences)
-
-    def _get_best_chunk(self, content: str, keywords: List[str]) -> str:
-        """回退策略：从内容中获取最相关的片段。"""
-        # 按段落拆分
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
-        
-        if not paragraphs:
-            return content[:1500]  # 兜底
-        
-        # 根据关键词出现次数为段落打分
-        scored_paras = []
-        for para in paragraphs:
-            para_lower = para.lower()
-            score = sum(para_lower.count(kw.lower()) for kw in keywords)
-            if score > 0:
-                scored_paras.append((para, score))
-        
-        if not scored_paras:
-            # 未找到关键词则返回前若干段
-            return '\n\n'.join(paragraphs[:2])
-        
-        # 按得分排序并组合高分段落
-        scored_paras.sort(key=lambda x: x[1], reverse=True)
-        
-        result_paras = []
-        total_tokens = 0
-        max_tokens = self.max_tokens_per_request // 4
-        
-        for para, score in scored_paras:
-            para_tokens = len(self.encode_text_to_tokens(para))
-            if total_tokens + para_tokens > max_tokens:
-                break
-            result_paras.append(para)
-            total_tokens += para_tokens
-        
-        return '\n\n'.join(result_paras) if result_paras else scored_paras[0][0]
+            # 使用 ECNU 专用客户端
+            response = self.ecnu_client.embeddings.create(
+                model=self.embedding_model,
+                input=text
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            print(f"Error getting embeddings: {e}")
+            return []
 
     def _truncate_text(self, text: str, max_tokens: int) -> str:
         """将文本截断到 token 上限。"""

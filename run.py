@@ -173,8 +173,9 @@ def main():
     """程序入口"""
     args = CLI(CommandArgs, as_positional=False)
 
-    api_key = args.api_key or os.getenv('API_KEY')
-    base_url = args.base_url or os.getenv('BASE_URL')
+    # 优先获取通用的 API_KEY，获取不到时再获取 ECNU_API_KEY 作为兜底
+    api_key = args.api_key or os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
+    base_url = args.base_url or os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL', 'https://api.ecnu.edu.cn/v1')
 
     if not api_key or not base_url:
         raise ValueError("API_KEY and BASE_URL must be provided via arguments or environment variables")
