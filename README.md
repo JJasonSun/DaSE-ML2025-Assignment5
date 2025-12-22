@@ -9,14 +9,26 @@
 1. 安装依赖：`pip install -r requirements.txt`
 2. 在项目根目录创建 `.env`，填写：
    ```env
-   API_KEY=你的API密钥
-   BASE_URL=https://chat.ecnu.edu.cn/open/api/v1  # 或你的兼容 OpenAI 的服务地址
+   # --- 基础配置 ---
    STUDENT_ID=学号
    STUDENT_NAME=姓名
    STUDENT_NICKNAME=昵称（排行榜显示）
-   MAIN_CONTRIBUTOR=human   # 或 ai
-   MODEL_NAME=模型名称（如 ecnu-max, glm-4.5 等）
-   ENABLE_THINK=false       # 是否启用深度思考模式（默认为 false）
+   MAIN_CONTRIBUTOR=ai       # 建议设置为 ai
+
+   # --- 主模型配置 (用于 LLM 生成答案) ---
+   API_KEY=你的API密钥
+   BASE_URL=https://api.xiaomimimo.com/v1  # 兼容 OpenAI 的服务地址
+   MODEL_NAME=mimo-v2-flash                # 主模型名称
+   ENABLE_THINK=false                      # 是否启用深度思考模式
+
+   # --- ECNU 专用模型配置 (用于 Embedding 和 Rerank，必须配置) ---
+   ECNU_API_KEY=你的ECNU密钥
+   ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
+
+   # --- 评测模型配置 (可选，独立于 Agent) ---
+   EVAL_API_KEY=评测密钥
+   EVAL_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+   EVAL_MODEL_NAME=glm-4.5
    ```
 3. 可运行 `python check_api.py` 验证 API_KEY 与 BASE_URL 是否可用；若设置了 MODEL_NAME 会顺便做一次推理测试。
 
@@ -26,8 +38,8 @@
 - `llm_multi_needle_haystack_tester.py`：多文档场景测试器，将多个 needle 插入不同文件并评测。
 - `llm_single_needle_haystack_tester.py`：单文档场景测试器，支持不同上下文长度与插入深度的组合。
 - `model.py`：`ModelProvider` 抽象基类，定义 Agent 必须实现的接口。
-- `agents/`：示例与参考 Agent，`agent_template.py`（异步示例），`sync_agent.py`（同步示例）。
-- `evaluators/`：评测器实现，`string_match_evaluator` 为精确匹配，`llm_evaluator` 使用大模型评分。
+- `agents/`：示例与参考 Agent，`agent_template.py`（异步示例），`sync_agent.py`（高级检索 Agent 实现）。
+- `evaluators/`：评测器实现，`string_match_evaluator` 为精确匹配，`llm_evaluator` 使用大模型评分（支持 JSON 模式与思考模式禁用）。
 - `test_case_loader.py`：读取与校验测试用例 JSON。
 - `test_cases/`：示例或评测用的测试用例文件夹。
 - `PaulGrahamEssays/`：默认的 haystack 文本集合。
@@ -52,23 +64,23 @@
 3. **本地运行评测**
 
    ```bash
-   # Bash / macOS / Linux（使用反斜杠作为续行符）
+   # Bash / macOS / Linux
    python run.py \
-      --agent agents.sync_agent:SyncRetrievalAgent \
+      --agent agents.sync_agent:AdvancedRetrievalAgent \
       --test_case_json test_cases/test_cases_all_en.json \
-      --test_mode multi \            # 可选 single/multi
-      --evaluator_type llm \         # 可选 string/llm
-      --num_tests 3                  # 多文档模式下重复次数
+      --test_mode multi \
+      --evaluator_type llm \
+      --num_tests 1
    ```
 
    ```powershell
-   # PowerShell（Windows）——使用反引号 ` 作为续行符
+   # PowerShell (Windows)
    python run.py `
-      --agent agents.sync_agent:SyncRetrievalAgent `
+      --agent agents.sync_agent:AdvancedRetrievalAgent `
       --test_case_json test_cases/test_cases_all_en.json `
       --test_mode multi `
       --evaluator_type llm `
-      --num_tests 3
+      --num_tests 1
    ```
 
    > 💡 **提示**：示例中默认使用 `--evaluator_type llm`，因为这是正式评测的标准。如果你在开发初期需要快速验证逻辑、节省 API 消耗，可以使用 `--evaluator_type string` 进行精确匹配测试。
@@ -96,7 +108,22 @@
 
 选择建议：若需快速批量验证用 `--evaluator_type string`；若想评估语义等价或更接近人工判断可选 `--evaluator_type llm`。若评估多文档检索稳健性选 `--test_mode multi`，做可控变量扫描时选 `--test_mode single`。
 
-4. **提交作业**
+## 高级检索 Agent 特性 (`AdvancedRetrievalAgent`)
+
+本项目默认推荐使用 `AdvancedRetrievalAgent`，它具备以下核心特性：
+
+1. **两阶段检索架构**：
+   - **粗排**：基于增强关键词提取（支持编码、日期、数字）进行文件级过滤。
+   - **精排**：集成 `ecnu-rerank` 模型，对候选片段进行语义重排序，确保“针”被精准定位。
+2. **API 隔离与兜底**：
+   - 检索阶段（Embedding/Rerank）强制走 `ECNU_API_KEY`，确保接口可用性。
+   - 生成阶段支持 `API_KEY` -> `ECNU_API_KEY` 自动兜底。
+3. **思考模式精准控制**：
+   - 针对 GLM-4.5 等模型，在关闭思考模式时显式发送 `thinking: disabled` 指令，防止“思考泄露”。
+4. **上下文优化**：
+   - 凭借 Rerank 的高精度，将上下文窗口优化至 **16K**，在保证准确率的同时大幅提升响应速度。
+
+## 提交作业
 
    使用 `submit.py` 脚本提交你的 Agent 实现。请确保提供完整的模块路径：
 
@@ -159,31 +186,29 @@ python run.py `
 ```bash
 # Bash / macOS / Linux
 python run.py \
-   --agent agents.sync_agent:SyncRetrievalAgent \
+   --agent agents.sync_agent:AdvancedRetrievalAgent \
    --test_case_json test_cases/test_cases_all_en.json \
    --test_mode multi \
    --evaluator_type llm \
-   --num_tests 5 \
+   --num_tests 1 \
    --save_results True
 ```
 
 ```powershell
-# PowerShell（Windows）
+# PowerShell (Windows)
 python run.py `
-   --agent agents.sync_agent:SyncRetrievalAgent `
+   --agent agents.sync_agent:AdvancedRetrievalAgent `
    --test_case_json test_cases/test_cases_all_en.json `
    --test_mode multi `
    --evaluator_type llm `
-   --num_tests 5 `
+   --num_tests 1 `
    --save_results True
 ```
 
 4) 提交（确认 `results/` 与 `.env` 中的学生信息正确后）
 
 ```bash
-python submit.py --agent your_module:YourAgentClass
-
-# python submit.py --agent agents.sync_agent:SyncRetrievalAgent
+python submit.py --agent agents.sync_agent:AdvancedRetrievalAgent
 ```
 
 要点提示：
