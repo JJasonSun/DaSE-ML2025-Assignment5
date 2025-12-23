@@ -26,9 +26,9 @@ class AdvancedRetrievalAgent(ModelProvider):
         load_dotenv()
         # 1. 主模型配置 (用于 LLM 生成)
         # 优先使用传入参数，否则按 API_KEY -> ECNU_API_KEY 顺序获取
-        self.api_key = api_key or os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
-        self.base_url = (base_url or os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL')).rstrip('/')
-        self.model_name = os.getenv('MODEL_NAME', 'ecnu-max')
+        self.api_key = os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
+        self.base_url = (os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL')).rstrip('/')
+        self.model_name = os.getenv('MODEL_NAME') or 'ecnu-plus'
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
         # 2. ECNU 专用模型配置 (用于 Embedding 和 Rerank)

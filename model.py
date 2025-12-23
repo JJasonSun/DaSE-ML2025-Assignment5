@@ -11,11 +11,11 @@ class ModelProvider(ABC):
 
     def __init__(self, api_key: str, base_url: str):
         """
-        Initialize the model provider.
+        初始化模型提供者。
 
         Args:
-            api_key: API key for the LLM service
-            base_url: Base URL for the LLM service
+            api_key: LLM 服务的 API Key
+            base_url: LLM 服务的基础地址
         """
         self.api_key = api_key
         self.base_url = base_url
