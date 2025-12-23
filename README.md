@@ -4,33 +4,62 @@
 
 本项目实现“Needle in a Haystack”长文本检索评测框架。系统会把若干关键信息（needle）随机插入多篇文章（haystack）中，并调用你实现的 Agent 来回答相关问题，最后使用评测器打分。你可以用该框架本地调试、提交并查看排行榜成绩。
 
-## 环境与依赖
+## 🚀 核心检索策略 (Advanced Retrieval Strategy)
 
-1. 安装依赖：`pip install -r requirements.txt`
-2. 在项目根目录创建 `.env`，填写：
-   ```env
-   # --- 基础配置 ---
-   STUDENT_ID=学号
-   STUDENT_NAME=姓名
-   STUDENT_NICKNAME=昵称（排行榜显示）
-   MAIN_CONTRIBUTOR=ai       # 建议设置为 ai
+本项目实现了一个基于 **AdvancedRetrievalAgent** 的高精度多文档检索系统，专门针对长文本中的“大海捞针”场景进行了深度优化。
 
-   # --- 主模型配置 (用于 LLM 生成答案) ---
-   API_KEY=你的API密钥
-   BASE_URL=https://api.xiaomimimo.com/v1  # 兼容 OpenAI 的服务地址
-   MODEL_NAME=mimo-v2-flash                # 主模型名称
-   ENABLE_THINK=false                      # 是否启用深度思考模式
+### 1. 全量分块与粗筛 (Chunking & Hybrid Filtering)
+*   **滑动窗口分块**：将所有文档切分为约 1200 字符的块（带 300 字符重叠），确保没有任何信息遗漏，同时保证语义片段的完整性。
+*   **关键词评分 (BM25 思想)**：针对问题中的编码、数字、日期等硬信息进行关键词匹配评分。
+*   **批量向量化 (Batch Embedding)**：利用 `ecnu-embedding-small` 模型，对关键词得分最高的前 200 个块进行批量向量化处理。
+*   **混合评分 (Hybrid Score)**：综合向量相似度 (70%) 与关键词匹配 (30%)，选出前 100 个最相关的候选片段。
 
-   # --- ECNU 专用模型配置 (用于 Embedding 和 Rerank，必须配置) ---
-   ECNU_API_KEY=你的ECNU密钥
-   ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
+### 2. 大规模重排序 (Large-scale Reranking)
+*   **精排把关**：使用 `ecnu-rerank` 模型对 100 个候选片段进行全量重排序。该模型在 8K 上下文内具有极高的区分度，能有效将“针”从干扰项中剥离。
+*   **高密度上下文**：最终选取重排得分最高的 **30 个片段**（约 10k-15k tokens）作为 LLM 的输入上下文。
 
-   # --- 评测模型配置 (可选，独立于 Agent) ---
-   EVAL_API_KEY=评测密钥
-   EVAL_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-   EVAL_MODEL_NAME=glm-4.5
-   ```
-3. 可运行 `python check_api.py` 验证 API_KEY 与 BASE_URL 是否可用；若设置了 MODEL_NAME 会顺便做一次推理测试。
+### 3. 鲁棒的 LLM 生成
+*   **JSON 模式强制输出**：确保 Agent 返回结构化的 JSON 结果，避免思维链（Thinking Process）泄露到最终答案中。
+*   **思维链控制**：针对支持思考的模型（如 GLM-4.5），显式控制 `thinking` 模式的开启与关闭，提升响应速度并防止格式污染。
+
+---
+
+## ⚙️ 环境配置 (.env)
+
+请确保你的 `.env` 文件包含以下配置。**注意：我们对 API 获取逻辑进行了重要改动。**
+
+### 1. 基础配置
+```env
+# --- 基础配置 ---
+STUDENT_ID=学号
+STUDENT_NAME=姓名
+STUDENT_NICKNAME=昵称（排行榜显示）
+MAIN_CONTRIBUTOR=ai
+
+# --- 主模型配置 (用于 Agent 生成答案) ---
+API_KEY=你的API密钥
+BASE_URL=https://api.example.com/v1
+MODEL_NAME=glm-4.5-plus
+ENABLE_THINK=false
+
+# --- ECNU 专用模型配置 (用于 Embedding 和 Rerank，必须配置) ---
+ECNU_API_KEY=你的ECNU密钥
+ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
+```
+
+### 2. 评测器配置 (LLMEvaluator)
+**⚠️ 重要改动：** `LLMEvaluator` 现在会**直接且优先**从以下环境变量中获取 API 信息，以实现评测环境与 Agent 环境的完全隔离：
+
+```env
+# --- 评测模型配置 (可选，独立于 Agent) ---
+EVAL_API_KEY=评测密钥
+EVAL_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+EVAL_MODEL_NAME=glm-4.5
+```
+
+---
+
+## 🛠️ 常用指令
 
 ## 目录速览与文件作用
 
