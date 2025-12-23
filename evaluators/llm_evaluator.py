@@ -20,11 +20,16 @@ Score 10: The answer is completely accurate and matches the ground truth.
 
     def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str, model_name: Optional[str] = None):
         """Initialize the LLM evaluator."""
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        # 优先级：EVAL 环境变量 > 主环境变量
+        final_api_key = os.getenv('EVAL_API_KEY') or os.getenv('API_KEY')
+        final_base_url = os.getenv('EVAL_BASE_URL') or os.getenv('BASE_URL')
+        
+        self.client = OpenAI(api_key=final_api_key, base_url=final_base_url)
         self.ground_truth = ground_truth
         self.question = question
-        # 优先使用传入的 model_name，否则从环境变量获取，最后兜底
-        self.model_name = model_name or os.getenv('EVAL_MODEL_NAME', 'ecnu-max')
+        
+        # model_name 同样优先使用环境变量配置
+        self.model_name = os.getenv('EVAL_MODEL_NAME') or os.getenv('MODEL_NAME')
 
     def evaluate_response(self, response: str) -> int:
         """Evaluate a response using LLM."""

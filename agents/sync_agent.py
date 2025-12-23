@@ -1,7 +1,7 @@
 import json
 import os
 import asyncio
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 import tiktoken
 import re
 import requests
@@ -32,7 +32,6 @@ class AdvancedRetrievalAgent(ModelProvider):
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
         # 2. ECNU 专用模型配置 (用于 Embedding 和 Rerank)
-        # 强制走 ECNU_API_KEY，避免主模型 provider (如 mimo) 不支持这些模型导致 404
         self.ecnu_api_key = os.getenv('ECNU_API_KEY') or self.api_key
         self.ecnu_base_url = os.getenv('ECNU_BASE_URL').rstrip('/')
         self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
@@ -343,43 +342,81 @@ class AdvancedRetrievalAgent(ModelProvider):
 
     def _retrieve_content(self, context_data: Dict, question: str) -> str:
         """
-        使用关键词初步筛选 + Rerank 精排的策略获取内容。
+        优化后的检索策略：全量分块 + 向量/关键词混合筛选 + 大规模 Rerank
         """
         files = context_data['files']
         keywords = self._get_keywords(question)
+        query_emb = self._get_embeddings(question)
         
-        # 1. 关键词初步筛选文件
-        relevant_files = []
+        all_chunks = []
+        chunk_size = 1200
+        overlap = 300
+        
+        # 1. 全量分块
         for file_data in files:
             filename = file_data['filename']
             content = file_data['modified_content']
-            content_lower = content.lower()
             
-            keyword_matches = sum(content_lower.count(kw.lower()) for kw in keywords)
-            if keyword_matches > 0:
-                relevant_files.append((filename, keyword_matches, file_data))
+            # 简单的滑动窗口分块
+            start = 0
+            while start < len(content):
+                end = start + chunk_size
+                chunk_text = content[start:end].strip()
+                if len(chunk_text) > 50:
+                    all_chunks.append({
+                        "filename": filename,
+                        "content": chunk_text,
+                        "kw_score": 0.0,
+                        "emb_score": 0.0
+                    })
+                start += (chunk_size - overlap)
         
-        relevant_files.sort(key=lambda x: x[1], reverse=True)
-        
-        # 2. 从高相关文件中提取候选片段
-        all_candidate_snippets = []
-        for filename, score, file_data in relevant_files[:self.top_k_files]:
-            content = file_data['modified_content']
-            snippets = self._extract_relevant_snippets(content, keywords)
-            for s in snippets:
-                # 给片段加上文件名标识，方便模型定位
-                all_candidate_snippets.append(f"[{filename}] {s}")
-        
-        if not all_candidate_snippets:
+        if not all_chunks:
             return "No relevant content found."
 
-        # 3. 使用 ecnu-rerank 对所有片段进行精排
-        # 由于 rerank 接口可能有文档数量限制，我们取前 50 个最相关的片段进行重排
-        # 这里的“最相关”先按关键词简单过滤
-        top_candidates = all_candidate_snippets[:50]
-        reranked_snippets = self._rerank_documents(question, top_candidates, top_n=20)
+        # 2. 计算所有分块的得分 (并行/批量处理思想)
+        # 注意：为了保证速度，我们对所有块进行关键词评分，对前 N 个进行向量评分
+        for chunk in all_chunks:
+            content_lower = chunk["content"].lower()
+            # 关键词评分
+            chunk["kw_score"] = sum(1 for kw in keywords if kw.lower() in content_lower)
         
-        # 4. 组合最终上下文，确保不超过 token 限制
+        # 按关键词初步排序，取前 200 个进行向量精筛（如果 query_emb 存在）
+        if query_emb:
+            all_chunks.sort(key=lambda x: x["kw_score"], reverse=True)
+            # 批量获取前 200 个块的向量
+            candidate_chunks = all_chunks[:200]
+            texts_to_embed = [c["content"] for c in candidate_chunks]
+            
+            # 分批处理，防止单次请求过大（虽然 200 应该没问题，但分批更稳）
+            batch_size = 50
+            all_doc_embs = []
+            for i in range(0, len(texts_to_embed), batch_size):
+                batch = texts_to_embed[i:i+batch_size]
+                batch_embs = self._get_embeddings(batch)
+                all_doc_embs.extend(batch_embs)
+            
+            # 计算相似度
+            for chunk, doc_emb in zip(candidate_chunks, all_doc_embs):
+                if doc_emb:
+                    chunk["emb_score"] = sum(a * b for a, b in zip(query_emb, doc_emb))
+        
+        # 3. 综合排序，选取候选池
+        # 综合得分 = 归一化关键词(0.3) + 向量(0.7)
+        for chunk in all_chunks:
+            norm_kw = min(1.0, chunk["kw_score"] / (len(keywords) + 1))
+            chunk["total_score"] = norm_kw * 0.3 + chunk["emb_score"] * 0.7
+            
+        all_chunks.sort(key=lambda x: x["total_score"], reverse=True)
+        
+        # 选取前 100 个最相关的片段进入 Rerank 阶段
+        top_candidates = [f"[{c['filename']}] {c['content']}" for c in all_chunks[:100]]
+        
+        # 4. 大规模 Rerank (ecnu-rerank)
+        # 既然没有上限，我们直接重排前 100 个片段
+        reranked_snippets = self._rerank_documents(question, top_candidates, top_n=30)
+        
+        # 5. 组合最终上下文
         content_parts = []
         total_tokens = 0
         
@@ -489,18 +526,25 @@ class AdvancedRetrievalAgent(ModelProvider):
         # 去重并限制数量
         return list(dict.fromkeys(keywords))[:20]
 
-    def _get_embeddings(self, text: str) -> List[float]:
-        """使用 ecnu-embedding-small 获取文本向量。"""
+    def _get_embeddings(self, input_data: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        """使用 ecnu-embedding-small 获取文本向量，支持批量。"""
         try:
             # 使用 ECNU 专用客户端
             response = self.ecnu_client.embeddings.create(
                 model=self.embedding_model,
-                input=text
+                input=input_data
             )
-            return response.data[0].embedding
+            if isinstance(input_data, str):
+                return response.data[0].embedding
+            else:
+                # 确保返回顺序一致
+                embeddings = [None] * len(input_data)
+                for item in response.data:
+                    embeddings[item.index] = item.embedding
+                return embeddings
         except Exception as e:
             print(f"Error getting embeddings: {e}")
-            return []
+            return [] if isinstance(input_data, str) else [[] for _ in input_data]
 
     def _truncate_text(self, text: str, max_tokens: int) -> str:
         """将文本截断到 token 上限。"""
