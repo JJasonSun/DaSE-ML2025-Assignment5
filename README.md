@@ -95,7 +95,7 @@ EVAL_MODEL_NAME=glm-4.5
    ```bash
    # Bash / macOS / Linux
    python run.py \
-      --agent agents.sync_agent:AdvancedRetrievalAgent \
+      --agent agents.agent_plus:AdvancedRetrievalAgent \
       --test_case_json test_cases/test_cases_all_en.json \
       --test_mode multi \
       --evaluator_type llm \
@@ -105,7 +105,7 @@ EVAL_MODEL_NAME=glm-4.5
    ```powershell
    # PowerShell (Windows)
    python run.py `
-      --agent agents.sync_agent:AdvancedRetrievalAgent `
+      --agent agents.agent_plus:AdvancedRetrievalAgent `
       --test_case_json test_cases/test_cases_all_en.json `
       --test_mode multi `
       --evaluator_type llm `
@@ -215,7 +215,7 @@ python run.py `
 ```bash
 # Bash / macOS / Linux
 python run.py \
-   --agent agents.sync_agent:AdvancedRetrievalAgent \
+   --agent agents.agent_plus:AdvancedRetrievalAgent \
    --test_case_json test_cases/test_cases_all_en.json \
    --test_mode multi \
    --evaluator_type llm \
@@ -226,7 +226,7 @@ python run.py \
 ```powershell
 # PowerShell (Windows)
 python run.py `
-   --agent agents.sync_agent:AdvancedRetrievalAgent `
+   --agent agents.agent_plus:AdvancedRetrievalAgent `
    --test_case_json test_cases/test_cases_all_en.json `
    --test_mode multi `
    --evaluator_type llm `
@@ -237,7 +237,7 @@ python run.py `
 4) 提交（确认 `results/` 与 `.env` 中的学生信息正确后）
 
 ```bash
-python submit.py --agent agents.sync_agent:AdvancedRetrievalAgent
+python submit.py --agent agents.agent_plus:AdvancedRetrievalAgent
 ```
 
 要点提示：

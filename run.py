@@ -25,7 +25,7 @@ class CommandArgs:
     base_url: Optional[str] = None  # 可选：覆盖环境变量中的 BASE_URL（命令行优先）
 
     test_mode: Optional[str] = "multi"  # 测试模式：'multi'（多文档，多 needle）或 'single'（单文档，单 needle）
-    evaluator_type: Optional[str] = "string"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
+    evaluator_type: Optional[str] = "llm"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
     haystack_dir: Optional[str] = "PaulGrahamEssays"  # 存放 haystack 文本文件的目录（用于插入 needles）
     results_version: Optional[int] = 1  # 结果保存的版本号，用于区分不同实验批次
 
@@ -43,7 +43,7 @@ class CommandArgs:
     document_depth_percent_intervals: Optional[int] = 10  # 深度划分区间数
 
     # 输出控制：
-    save_results: Optional[bool] = True  # 是否将每次测试结果保存到 results/（json 文件）
+    save_results: Optional[bool] = False  # 是否将每次测试结果保存到 results/（json 文件）
     save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
     print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）
 
