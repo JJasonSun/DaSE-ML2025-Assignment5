@@ -72,8 +72,7 @@ def test_evaluator():
             api_key=api_key,
             base_url=base_url,
             ground_truth=scenario['ground_truth'],
-            question=scenario['question'],
-            model_name=model_name
+            question=scenario['question']
         )
         
         score = evaluator.evaluate_response(scenario['candidate'])

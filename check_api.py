@@ -32,15 +32,13 @@ if not model_name:
     raise ValueError("MODEL_NAME is not set in the environment. Please add it to .env or set it before running.")
 
 
-# 从环境变量获取是否启用思考模式，默认为 false
-enable_think = os.getenv('ENABLE_THINK', 'false').lower() == 'true'
 extra_body = {}
 
 # 除了 ecnu 的模型都要支持启用/禁用思考模式
 if "ecnu" not in model_name.lower():
     extra_body = {
         "thinking": {
-            "type": "enabled" if enable_think else "disabled"
+            "type": "enabled" # 可选值: "enabled", "disabled"
         }
     }
 

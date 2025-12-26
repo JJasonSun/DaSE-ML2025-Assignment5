@@ -1,7 +1,6 @@
-import os
-import json
+﻿import os
 from openai import OpenAI
-from typing import Dict, Optional
+from typing import Dict
 from .evaluator import Evaluator
 
 
@@ -18,18 +17,37 @@ Score 10: The answer is completely accurate and matches the ground truth.
 """
     }
 
-    def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str, model_name: Optional[str] = None):
+    def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str):
         """Initialize the LLM evaluator."""
-        # 优先级：EVAL 环境变量 > 主环境变量
-        final_api_key = os.getenv('EVAL_API_KEY') or os.getenv('API_KEY')
-        final_base_url = os.getenv('EVAL_BASE_URL') or os.getenv('BASE_URL')
-        
-        self.client = OpenAI(api_key=final_api_key, base_url=final_base_url)
+        # 优先从环境变量获取评测专用配置，实现评测与 Agent 的 API 隔离
+        eval_api_key = os.getenv('EVAL_API_KEY') or os.getenv('API_KEY')
+        eval_base_url = os.getenv('EVAL_BASE_URL') or os.getenv('BASE_URL')
+        # 初始化 OpenAI 客户端
+        self.client = OpenAI(api_key=eval_api_key, base_url=eval_base_url)
         self.ground_truth = ground_truth
         self.question = question
-        
-        # model_name 同样优先使用环境变量配置
+        # 从环境变量获取评测模型名称
         self.model_name = os.getenv('EVAL_MODEL_NAME') or os.getenv('MODEL_NAME')
+        
+        # 准备兜底配置
+        self.ecnu_api_key = os.getenv('ECNU_API_KEY')
+        self.ecnu_base_url = os.getenv('ECNU_BASE_URL')
+
+    def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
+        """封装 API 调用逻辑。"""
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system",
+                 "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0,
+            max_tokens=10
+        )
+        if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
+            return None
+        return completion.choices[0].message.content.strip()
 
     def evaluate_response(self, response: str) -> int:
         """Evaluate a response using LLM."""
@@ -42,53 +60,41 @@ Answer: {response}
 Scoring Criteria:
 {self.CRITERIA['accuracy']}
 
-Please evaluate the answer and respond with a JSON object: {{"score": number}}."""
+Please evaluate the answer and respond with ONLY a single number from 0 to 10. Do not include any explanation or other text."""
 
-        content = ""
+        score_text = None
+        
+        # 1. 尝试主模型
         try:
-            # 检查模型是否支持 thinking 参数（如 GLM 系列）
-            # 排除明确不支持的 ECNU 模型
-            unsupported_models = ['ecnu-max', 'ecnu-plus', 'ecnu-turbo']
-            supports_thinking = not any(m in self.model_name.lower() for m in unsupported_models)
-            
-            # 评测模型不需要思考模式，如果支持则显式禁用
-            extra_body = None
-            if supports_thinking:
-                extra_body = {
-                    "thinking": {
-                        "type": "disabled"
-                    }
-                }
+            score_text = self._call_api(self.client, self.model_name, evaluation_prompt)
+        except Exception as e:
+            print(f"Primary evaluation model ({self.model_name}) failed: {e}")
 
-            completion = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system",
-                     "content": "You are an expert evaluator. Respond only with a JSON object containing the score: {\"score\": number}."},
-                    {"role": "user", "content": evaluation_prompt}
-                ],
-                temperature=0,
-                max_tokens=100,
-                response_format={"type": "json_object"},
-                extra_body=extra_body
-            )
-            
-            content = completion.choices[0].message.content.strip()
-            data = json.loads(content)
-            score = int(data.get("score", 0))
-            
+        # 2. 兜底策略：如果主模型失败且有 ECNU 配置，换用 ecnu-plus
+        if score_text is None and self.ecnu_api_key and self.ecnu_base_url:
+            print(f"Switching to fallback model: ecnu-plus")
+            try:
+                ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
+                score_text = self._call_api(ecnu_client, "ecnu-plus", evaluation_prompt)
+            except Exception as e:
+                print(f"Fallback evaluation model (ecnu-plus) failed: {e}")
+
+        if score_text is None:
+            return 0
+
+        # 3. 解析分数
+        try:
+            # 尝试提取第一个数字，以防模型返回了额外文字
+            import re
+            nums = re.findall(r'\d+', score_text)
+            if nums:
+                score = int(nums[0])
+            else:
+                score = 0
+                
             if score < 0 or score > 10:
                 score = max(0, min(10, score))
             return score
-            
         except Exception as e:
-            print(f"Error during evaluation: {e}")
-            # 兜底逻辑：尝试从文本中提取数字
-            try:
-                import re
-                nums = re.findall(r'\d+', content)
-                if nums:
-                    return max(0, min(10, int(nums[0])))
-            except:
-                pass
+            print(f"Error parsing score text '{score_text}': {e}")
             return 0
