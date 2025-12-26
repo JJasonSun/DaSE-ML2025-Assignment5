@@ -72,7 +72,7 @@ class AdvancedRetrievalAgent(ModelProvider):
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Return ONLY a JSON object: {\"answer\": \"...\"}."
+                "Return ONLY a JSON object: {{\"answer\": \"...\"}}."
             ),
         }
 
@@ -86,7 +86,7 @@ class AdvancedRetrievalAgent(ModelProvider):
         timeout: int = 60,
         response_format: Optional[Dict] = None,
         enable_thinking: bool = False,
-        thinking_budget_tokens: int = 256,
+        thinking_budget_tokens: int = 1024,
     ) -> str:
         model_to_use = model or self.model_name
         params: Dict = {
@@ -109,8 +109,11 @@ class AdvancedRetrievalAgent(ModelProvider):
         if extra_body:
             params["extra_body"] = extra_body
 
+        # 根据模型名称自动选择 Client
+        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
+
         def _sync_call():
-            return self.client.chat.completions.create(**params)
+            return client_to_use.chat.completions.create(**params)
 
         try:
             try:
@@ -129,10 +132,18 @@ class AdvancedRetrievalAgent(ModelProvider):
             choice = result.get("choices", [{}])[0]
             message = choice.get("message", {})
             content = message.get("content", "")
+            reasoning = message.get("reasoning_content", "")
+            finish_reason = choice.get("finish_reason", "unknown")
+
             if isinstance(content, str) and content.strip():
                 return content.strip()
-            # 避免把 reasoning_content 当作最终答案
-            finish_reason = choice.get("finish_reason", "unknown")
+            
+            # 如果 content 为空但有 reasoning_content，可能是因为思维链过长导致截断
+            # 尝试返回思维链内容，以便 _extract_answer 尝试从中解析答案
+            if isinstance(reasoning, str) and reasoning.strip():
+                print(f"[Debug] Content is empty, but reasoning_content found (finish_reason: {finish_reason})")
+                return reasoning.strip()
+
             return f"Empty response (finish_reason: {finish_reason})"
         except Exception as e:
             return f"Response parsing error: {str(e)[:80]}"
@@ -204,11 +215,11 @@ class AdvancedRetrievalAgent(ModelProvider):
                 messages=messages,
                 model=fallback_model,
                 temperature=0,
-                max_tokens=500,
+                max_tokens=1000,
                 timeout=90,
                 response_format={"type": "json_object"},
                 enable_thinking=True,
-                thinking_budget_tokens=256,
+                thinking_budget_tokens=1024,
             )
             answer = self._extract_answer(response_raw)
 
