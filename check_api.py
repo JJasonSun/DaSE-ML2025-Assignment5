@@ -34,25 +34,30 @@ if not model_name:
 
 extra_body = {}
 
-# 除了 ecnu 的模型都要支持启用/禁用思考模式
-if "ecnu" not in model_name.lower():
+# 所有的 ecnu 模型都不支持 thinking 参数
+if not model_name.lower().startswith("ecnu"):
     extra_body = {
         "thinking": {
-            "type": "enabled" # 可选值: "enabled", "disabled"
+            "type": "enabled" # 可选值: "auto", "enabled", "disabled"
         }
     }
 
 completion = client.chat.completions.create(
     model=model_name,
     messages=[
-        {"role": "system", "content": "你是一个实用的ai助手"},
-        {"role": "user", "content": "请简要介绍一下你自己并随机回复一个数字"}
+        {"role": "system", "content": "你是一个高精度的检索和计算助手。请根据提供的上下文回答问题，并使用中文回答,直接给出最终答案。"},
+        {"role": "user", "content": """Context:
+1. Asset Vault Alpha contains a critical resource count of 4931305872608785 units. Security clearance level: OMEGA.
+2. Operational Database Beta tracks emergency reserves at 4106935655129089 units. Classification: EYES ONLY.
+3. Strategic multiplier designation GAMMA-394 must be applied to all differential calculations.
+4. The contingency divisor ZETA-41 is authorized for final resource allocation.
+
+Question: As the lead resource coordinator for Project Chimera, you need to calculate the final emergency deployment allocation. Access the classified asset vault numbers (Alpha and Beta), determine the resource differential, apply the strategic multiplier Gamma, then divide by the contingency divisor Zeta using integer division. What is the precise deployment figure? 请使用中文回答。"""}
     ],
-    top_p=0.7,
-    temperature=0.3,
+    top_p=0.95,
+    temperature=1,
     extra_body=extra_body,
-    stream=False,  # 禁用流式响应
-    max_tokens=512
+    max_tokens=16000
 )
 
 # 解析响应并打印结果

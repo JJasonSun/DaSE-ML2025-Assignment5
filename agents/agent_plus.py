@@ -54,25 +54,23 @@ class AdvancedRetrievalAgent(ModelProvider):
         self.prompts = self._load_prompts()
 
     def _load_prompts(self) -> Dict[str, str]:
-        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts", "agent_prompts.json")
-        try:
-            if os.path.exists(prompt_path):
-                with open(prompt_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        except Exception:
-            pass
-
         return {
             "system_prompt": (
-                "You are a high-precision retrieval agent.\n"
-                "Use ONLY the provided context/evidence.\n"
-                "If the answer is not present, reply \"Unknown\".\n"
-                "Return ONLY a JSON object: {\"answer\": \"...\"}.\n"
-                "Do NOT output your reasoning."
+                "你是一个高精度的检索助手。你的目标是从提供的上下文中提取准确的答案。\n\n"
+                "### 关键指令：\n"
+                "1. **精准与依据**：仅使用提供的上下文。不要使用外部知识。在内部推理过程中引用或参考上下文的具体部分。\n"
+                "2. **逐步推理**：有条理地分析问题和上下文。将复杂问题分解为逻辑子步骤（例如：定位实体 -> 查找日期 -> 计算差值）。\n"
+                "3. **坚持不懈**：在得出信息缺失的结论之前，穷尽上下文中所有的可能性。\n"
+                "4. **输出格式**：仅返回一个包含 \"answer\" 键的 JSON 对象。\n"
+                "5. **无对话废话**：不要解释为什么找不到答案，也不要提供任何前导说明。如果经过详尽搜索后答案确实不存在，请将 \"answer\" 设置为 \"Unknown\"。\n\n"
+                "### 约束条件：\n"
+                "- 如果找到了答案，请简洁地提供。\n"
+                "- 如果未找到答案，返回 {\"answer\": \"Unknown\"}。\n"
+                "- 严禁在 JSON 之外输出类似“信息未指定”之类的文本。"
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Return ONLY a JSON object: {{\"answer\": \"...\"}}."
+                "请以 JSON 格式返回最终答案：{{\"answer\": \"...\"}}"
             ),
         }
 
@@ -87,6 +85,7 @@ class AdvancedRetrievalAgent(ModelProvider):
         response_format: Optional[Dict] = None,
         enable_thinking: bool = False,
         thinking_budget_tokens: int = 1024,
+        top_p: float = 1.0,
     ) -> str:
         model_to_use = model or self.model_name
         params: Dict = {
@@ -95,17 +94,20 @@ class AdvancedRetrievalAgent(ModelProvider):
             "temperature": temperature,
             "max_tokens": max_tokens,
             "timeout": timeout,
+            "top_p": top_p,
         }
         if response_format:
             params["response_format"] = response_format
 
         extra_body: Dict = {}
-        if self._supports_thinking(model_to_use):
+        # 仅对非 ecnu 模型（即主回答模型）应用思考模式配置
+        if not model_to_use.startswith("ecnu-"):
             if enable_thinking:
-                print("本次任务开启思考模式")
+                print(f"本次任务对模型 {model_to_use} 开启深度思考")
                 extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
             else:
                 extra_body["thinking"] = {"type": "disabled"}
+        
         if extra_body:
             params["extra_body"] = extra_body
 
@@ -169,6 +171,8 @@ class AdvancedRetrievalAgent(ModelProvider):
             return "Missing required input data"
 
         full_context = self._build_full_context(context_data)
+        
+        # 1. 初次尝试：使用原始问题进行检索
         if full_context["total_tokens"] <= self.full_context_threshold_tokens:
             context_for_llm = full_context["text"]
         else:
@@ -182,57 +186,52 @@ class AdvancedRetrievalAgent(ModelProvider):
             {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
         ]
 
-        # 默认不启用思考模式（避免输出 reasoning_content、减少截断风险）
+        # 全部调用思考模式，增加 tokens 预算以允许充分思考
         response_raw = await self._create_chat_completion(
             messages=messages,
-            temperature=0,
-            max_tokens=800,
-            timeout=90,
+            temperature=1,
+            top_p=0.95,
+            max_tokens=16000,
+            timeout=180,
             response_format={"type": "json_object"},
-            enable_thinking=False,
+            enable_thinking=True,
+            thinking_budget_tokens=8000,
         )
         answer = self._extract_answer(response_raw)
 
-        # 兜底：开启思考模式；ecnu-* 只有 ecnu-reasoner 支持 thinking
-        if not answer or answer.lower() == "unknown" or answer.lower().startswith("api error") or answer.lower().startswith("empty response"):
-            fallback_model = self._select_thinking_model(self.model_name)
-
+        # 2. 兜底策略：如果回答 Unknown 或为空，使用 ecnu-reasoner 进行深度思考
+        if not answer or answer.lower() == "unknown" or "empty response" in answer.lower():
+            print(f"[Debug] Initial attempt failed for: {question}. Trying ecnu-reasoner fallback...")
+            
             # 自适应策略：如果是因为检索不到，尝试扩大检索范围
             if full_context["total_tokens"] > self.full_context_threshold_tokens:
-                # 临时增加召回数量进行重试
+                print(f"[Debug] Expanding retrieval scope for fallback...")
+                expanded_queries = await self._expand_query(question)
+                
+                # 临时增加召回数量
                 orig_top_n = self.rerank_top_n
-                self.rerank_top_n = 15
-                evidence = self._retrieve_with_hybrid(question, context_data)
-                context_for_llm_retry = evidence["evidence_text"]
+                self.rerank_top_n = 15 
+                evidence = self._retrieve_with_hybrid(question, context_data, queries=expanded_queries)
+                context_for_llm = evidence["evidence_text"]
                 self.rerank_top_n = orig_top_n
 
+                # 更新消息中的上下文
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_template.format(context=context_for_llm_retry, question=question)},
+                    {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
                 ]
 
+            # 切换到更强大的推理模型
             response_raw = await self._create_chat_completion(
                 messages=messages,
-                model=fallback_model,
-                temperature=0,
-                max_tokens=1000,
-                timeout=90,
+                model="ecnu-reasoner",
+                temperature=1,
+                top_p=0.95,
+                max_tokens=16000,
+                timeout=240,
                 response_format={"type": "json_object"},
                 enable_thinking=True,
-                thinking_budget_tokens=1024,
-            )
-            answer = self._extract_answer(response_raw)
-
-        # 最后兜底：仍然空/被截断，则关闭思考重试一次（避免 reasoning 截断导致 content=None）
-        if not answer or answer.lower().startswith("empty response"):
-            response_raw = await self._create_chat_completion(
-                messages=messages,
-                model=self._select_thinking_model(self.model_name),
-                temperature=0,
-                max_tokens=500,
-                timeout=90,
-                response_format={"type": "json_object"},
-                enable_thinking=False,
+                thinking_budget_tokens=8000,
             )
             answer = self._extract_answer(response_raw)
 
@@ -262,7 +261,42 @@ class AdvancedRetrievalAgent(ModelProvider):
         return {"text": "\n\n".join(parts), "total_tokens": total_tokens}
 
     # -------------------------- Retrieval pipeline -------------------------- #
-    def _retrieve_with_hybrid(self, question: str, context_data: Dict) -> Dict[str, str]:
+    async def _expand_query(self, question: str) -> List[str]:
+        """
+        生成 3 个多样化的搜索查询，以提高 NIAH 任务的召回率。
+        """
+        prompt = (
+            "你是一个搜索专家。给定一个问题，请生成 3 个多样化的搜索查询，"
+            "以帮助在大文档中找到答案。重点关注不同的关键词和表述方式。"
+            "仅返回一个 JSON 字符串列表。\n\n"
+            f"问题: {question}\n\n"
+            "查询列表:"
+        )
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            # 硬编码使用 ecnu-plus 进行查询扩展，以提高召回率
+            response = await self._create_chat_completion(
+                messages=messages,
+                model="ecnu-plus",
+                temperature=0.3,
+                max_tokens=150,
+                enable_thinking=False
+            )
+            match = re.search(r"\[.*\]", response, re.DOTALL)
+            if match:
+                queries = json.loads(match.group(0))
+                if isinstance(queries, list) and len(queries) > 0:
+                    if question not in queries:
+                        queries.append(question)
+                    return queries[:4]
+        except Exception as e:
+            print(f"[Debug] Query expansion failed: {e}")
+        return [question]
+
+    def _retrieve_with_hybrid(self, question: str, context_data: Dict, queries: Optional[List[str]] = None) -> Dict[str, str]:
+        """
+        Hybrid retrieval: BM25 + Vector + Rerank. Supports multi-query expansion.
+        """
         files = context_data.get("files", []) or []
         if not files:
             return {"evidence_text": "No relevant content found."}
@@ -276,38 +310,43 @@ class AdvancedRetrievalAgent(ModelProvider):
         if not chunks:
             return {"evidence_text": "No relevant content found."}
 
-        keywords = self._get_keywords(question)
+        search_queries = queries if queries else [question]
+        bm25_indices = set()
+        vector_indices = set()
 
-        # 1) BM25 召回（精确匹配强）
-        bm25_scores = self._score_bm25(chunks, keywords)
-        bm25_top = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)[: self.top_k_bm25]
-        bm25_set = {idx for idx, _ in bm25_top}
+        # 1) BM25 & Vector Retrieval for each query
+        for q in search_queries:
+            # BM25
+            keywords = self._get_keywords(q)
+            bm25_scores = self._score_bm25(chunks, keywords)
+            bm25_top = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)[: self.top_k_bm25]
+            bm25_indices.update([idx for idx, score in bm25_top if score > 0])
 
-        # 2) Dense 召回（语义匹配强）
-        query_emb = self._get_embeddings(question)
-        vector_scores: List[Tuple[int, float]] = []
-        if query_emb:
-            # 若 chunk 较少就全量向量召回，否则只对 BM25 高分的若干 chunk 做向量（避免太慢）
-            if len(chunks) <= 300:
-                candidate_for_vector = list(range(len(chunks)))
-            else:
-                dense_pool = min(400, len(chunks))
-                bm25_pool = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)[:dense_pool]
-                candidate_for_vector = [idx for idx, _ in bm25_pool]
+            # Vector
+            query_emb = self._get_embeddings(q)
+            if query_emb:
+                if len(chunks) <= 300:
+                    candidate_for_vector = list(range(len(chunks)))
+                else:
+                    dense_pool = min(400, len(chunks))
+                    bm25_pool = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)[:dense_pool]
+                    candidate_for_vector = [idx for idx, _ in bm25_pool]
 
-            texts = [chunks[i]["text"] for i in candidate_for_vector]
-            doc_embs = self._get_embeddings_in_batches(texts, batch_size=64)
-            for idx, emb in zip(candidate_for_vector, doc_embs):
-                if emb:
-                    sim = self._cosine_similarity(query_emb, emb)
-                    vector_scores.append((idx, sim))
-            vector_scores = sorted(vector_scores, key=lambda x: x[1], reverse=True)[: self.top_k_vector]
+                texts = [chunks[i]["text"] for i in candidate_for_vector]
+                doc_embs = self._get_embeddings_in_batches(texts, batch_size=64)
+                
+                q_vector_scores = []
+                for idx, emb in zip(candidate_for_vector, doc_embs):
+                    if emb:
+                        sim = self._cosine_similarity(query_emb, emb)
+                        q_vector_scores.append((idx, sim))
+                q_vector_top = sorted(q_vector_scores, key=lambda x: x[1], reverse=True)[: self.top_k_vector]
+                vector_indices.update([idx for idx, sim in q_vector_top])
 
-        vector_set = {idx for idx, _ in vector_scores}
-
-        # 3) 合并候选并去重
-        merged_indices = list(bm25_set | vector_set)
-        merged_indices = merged_indices[: (self.top_k_bm25 + self.top_k_vector)]
+        # 2) Merge & Deduplicate
+        merged_indices = list(bm25_indices | vector_indices)
+        # Limit candidates for Rerank to maintain performance
+        merged_indices = merged_indices[:60]
 
         rerank_inputs: List[str] = []
         chunk_map: Dict[str, int] = {}
@@ -329,17 +368,16 @@ class AdvancedRetrievalAgent(ModelProvider):
         if not rerank_inputs:
             return {"evidence_text": "No relevant content found."}
 
-        # 4) Rerank 精排
+        # 3) Rerank (Always use original question as the anchor)
         reranked_results = self._rerank_documents(question, rerank_inputs, top_n=self.rerank_top_n * 2)
 
-        # 5) 组装 evidence（动态 Top-N + 上下文补全）
         if not reranked_results:
             return {"evidence_text": "No relevant content found."}
 
-        # 动态阈值：保留得分显著高于平均水平或前几名的
+        # 4) Assemble Evidence (Dynamic Top-N + Context Enrichment)
         scores = [r.get("relevance_score", 0) for r in reranked_results]
         max_score = max(scores) if scores else 0
-        threshold = max_score * 0.2  # 阈值：最高分的 20%
+        threshold = max_score * 0.15  # Lower threshold for multi-query to catch more potential needles
 
         evidence_blocks: List[str] = []
         total_tokens = 0
@@ -347,7 +385,6 @@ class AdvancedRetrievalAgent(ModelProvider):
 
         for rank_idx, res in enumerate(reranked_results):
             score = res.get("relevance_score", 0)
-            # 如果分数太低且已经有一定数量的证据，则停止
             if score < threshold and len(evidence_blocks) >= 3:
                 break
             if len(evidence_blocks) >= self.rerank_top_n:
@@ -364,7 +401,6 @@ class AdvancedRetrievalAgent(ModelProvider):
                     total_tokens += block_tokens
                     added_chunk_indices.add(orig_idx)
 
-                    # 上下文补全：对于前 3 名，尝试添加相邻 chunk 以保证语义完整
                     if rank_idx < 3:
                         for neighbor_idx in [orig_idx - 1, orig_idx + 1]:
                             if 0 <= neighbor_idx < len(chunks) and neighbor_idx not in added_chunk_indices:
@@ -440,11 +476,15 @@ class AdvancedRetrievalAgent(ModelProvider):
                 term = kw.lower()
                 if term not in tf:
                     continue
+                
+                # 权重增强：如果关键词包含连字符、数字或特殊符号，通常是“针”的关键特征，给予 2 倍权重
+                weight = 2.0 if ("-" in term or ":" in term or any(c.isdigit() for c in term)) else 1.0
+                
                 df_t = df.get(term, 0)
                 idf = math.log((N - df_t + 0.5) / (df_t + 0.5) + 1)
                 numer = tf[term] * (k1 + 1)
                 denom = tf[term] + k1 * (1 - b + b * dl / max(avgdl, 1e-6))
-                score += idf * numer / max(denom, 1e-6)
+                score += weight * idf * numer / max(denom, 1e-6)
             scores[idx] = score
         return scores
 
@@ -603,17 +643,4 @@ class AdvancedRetrievalAgent(ModelProvider):
         except Exception as e:
             print(f"Error during reranking: {e}")
             return [{"document": d, "relevance_score": 0.0} for d in documents[:top_n]]
-
-    # -------------------------- Thinking mode rules -------------------------- #
-    def _supports_thinking(self, model_name: str) -> bool:
-        name = (model_name or "").lower()
-        if name.startswith("ecnu-"):
-            return name == "ecnu-reasoner"
-        return True
-
-    def _select_thinking_model(self, current_model: str) -> str:
-        name = (current_model or "").lower()
-        if name.startswith("ecnu-") and name != "ecnu-reasoner":
-            return "ecnu-reasoner"
-        return current_model
 

@@ -19,22 +19,30 @@ Score 10: The answer is completely accurate and matches the ground truth.
 
     def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str):
         """Initialize the LLM evaluator."""
-        # 优先从环境变量获取评测专用配置，实现评测与 Agent 的 API 隔离
-        eval_api_key = os.getenv('EVAL_API_KEY') or os.getenv('API_KEY')
-        eval_base_url = os.getenv('EVAL_BASE_URL') or os.getenv('BASE_URL')
-        # 初始化 OpenAI 客户端
-        self.client = OpenAI(api_key=eval_api_key, base_url=eval_base_url)
         self.ground_truth = ground_truth
         self.question = question
-        # 从环境变量获取评测模型名称
-        self.model_name = os.getenv('EVAL_MODEL_NAME') or os.getenv('MODEL_NAME')
         
-        # 准备兜底配置
-        self.ecnu_api_key = os.getenv('ECNU_API_KEY')
-        self.ecnu_base_url = os.getenv('ECNU_BASE_URL')
+        # 1. 评测专用配置 (Primary)
+        self.eval_api_key = os.getenv('EVAL_API_KEY')
+        self.eval_base_url = os.getenv('EVAL_BASE_URL')
+        self.eval_model_name = os.getenv('EVAL_MODEL_NAME')
+        
+        # 2. Agent 配置 (Fallback)
+        self.agent_api_key = api_key
+        self.agent_base_url = base_url
+        self.agent_model_name = os.getenv('MODEL_NAME')
 
     def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
         """封装 API 调用逻辑。"""
+        extra_body = {}
+        # 评测时统一禁用思考模式，以获得快速且直接的分数输出
+        if not model.lower().startswith("ecnu"):
+            extra_body = {
+                "thinking": {
+                    "type": "disabled"
+                }
+            }
+
         completion = client.chat.completions.create(
             model=model,
             messages=[
@@ -43,7 +51,8 @@ Score 10: The answer is completely accurate and matches the ground truth.
                 {"role": "user", "content": prompt}
             ],
             temperature=0,
-            max_tokens=10
+            max_tokens=10,
+            extra_body=extra_body if extra_body else None
         )
         if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
             return None
@@ -64,20 +73,22 @@ Please evaluate the answer and respond with ONLY a single number from 0 to 10. D
 
         score_text = None
         
-        # 1. 尝试主模型
-        try:
-            score_text = self._call_api(self.client, self.model_name, evaluation_prompt)
-        except Exception as e:
-            print(f"Primary evaluation model ({self.model_name}) failed: {e}")
-
-        # 2. 兜底策略：如果主模型失败且有 ECNU 配置，换用 ecnu-plus
-        if score_text is None and self.ecnu_api_key and self.ecnu_base_url:
-            print(f"Switching to fallback model: ecnu-plus")
+        # 1. 尝试评测专用模型
+        if self.eval_api_key and self.eval_base_url and self.eval_model_name:
             try:
-                ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
-                score_text = self._call_api(ecnu_client, "ecnu-plus", evaluation_prompt)
+                eval_client = OpenAI(api_key=self.eval_api_key, base_url=self.eval_base_url)
+                score_text = self._call_api(eval_client, self.eval_model_name, evaluation_prompt)
             except Exception as e:
-                print(f"Fallback evaluation model (ecnu-plus) failed: {e}")
+                print(f"Evaluation model ({self.eval_model_name}) failed: {e}")
+
+        # 2. 兜底策略：使用 Agent 的 API
+        if score_text is None:
+            print(f"Switching to Agent API for evaluation fallback")
+            try:
+                agent_client = OpenAI(api_key=self.agent_api_key, base_url=self.agent_base_url)
+                score_text = self._call_api(agent_client, self.agent_model_name, evaluation_prompt)
+            except Exception as e:
+                print(f"Agent API evaluation failed: {e}")
 
         if score_text is None:
             return 0
