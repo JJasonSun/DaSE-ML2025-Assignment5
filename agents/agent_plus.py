@@ -39,6 +39,9 @@ class AdvancedRetrievalAgent(ModelProvider):
         self.ecnu_base_url = (os.getenv("ECNU_BASE_URL") or self.base_url).rstrip("/")
         self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
 
+        self.glm_api_key = os.getenv("GLM_API_KEY")
+        self.glm_base_url = (os.getenv("GLM_BASE_URL") or "https://open.bigmodel.cn/api/coding/paas/v4").rstrip("/")
+
         self.embedding_model = "ecnu-embedding-small"
         self.rerank_model = "ecnu-rerank"
 
@@ -57,21 +60,19 @@ class AdvancedRetrievalAgent(ModelProvider):
     def _load_prompts(self) -> Dict[str, str]:
         return {
             "system_prompt": (
-                "你是一个高精度的检索助手。你的目标是从提供的上下文中提取准确的答案。\n\n"
-                "### 关键指令：\n"
-                "1. **精准与依据**：主要依据提供的上下文。对于上下文中提到的日期但未明确给出星期几的情况，你必须积极进行推断和计算（例如已知日期推算星期几），不要因为上下文中没有直接写明星期几就认为未知。不要使用与上下文无关的外部知识，但可以运用通用的逻辑和计算能力。\n"
-                "2. **逐步推理**：有条理地分析问题和上下文。将复杂问题分解为逻辑子步骤（例如：定位实体 -> 查找日期 -> 计算差值/推算星期）。\n"
-                "3. **坚持不懈**：在得出信息缺失的结论之前，积极调用工具，穷尽上下文中所有的可能性。只要有相关线索，就要积极推理。\n"
-                "4. **输出格式**：仅返回一个包含 \"answer\" 键的 JSON 对象。\n"
-                "5. **无对话废话**：不要解释为什么找不到答案，也不要提供任何前导说明。如果经过详尽搜索和计算后答案确实不存在，请将 \"answer\" 设置为 \"Unknown\"。\n\n"
-                "### 约束条件：\n"
-                "- 如果找到了答案（包括通过计算得出的），请简洁地提供。\n"
-                "- 如果未找到答案，返回 {\"answer\": \"Unknown\"}。\n"
-                "- 严禁在 JSON 之外输出类似“信息未指定”之类的文本。"
+                "你是一名严谨的长文检索与推理专家，任务是完成大海捞针（Needle in a Haystack）场景：在海量上下文中精准定位并推导出答案。\n\n"
+                "【工作准则】\n"
+                "1) 专注依据：只使用提供的上下文与通用推理/计算能力，禁止引入无关外部知识。\n"
+                "2) 结构化思考：先拆解问题，再定位线索，逐步演绎，验证约束。\n"
+                "3) 积极求解：遇到日期需推算星期、数值需运算时，积极执行深度推导计算，并保证准确。\n"
+                "4) 结果唯一：仅输出一个 JSON 对象，形如 {\"answer\": \"...\"}。\n"
+                "5) 零赘述：不叙述过程，不解释缺失。若穷尽检索与计算仍无结果，返回 {\"answer\": \"Unknown\"}。\n"
+                "6) 容错与坚持：信息被遮蔽、分散或需跨段推理时，保持耐心与严密逻辑，避免遗漏。\n\n"
+                "【简要流程】分析需求 → 搜索/对齐证据 → 必要时执行精确计算 → 交叉校验 → 输出 JSON。"
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "请以 JSON 格式返回最终答案：{{\"answer\": \"...\"}}"
+                "请以 JSON 返回最终答案：{{\"answer\": \"...\"}}"
             ),
         }
 
@@ -113,7 +114,13 @@ class AdvancedRetrievalAgent(ModelProvider):
             params["extra_body"] = extra_body
 
         # 根据模型名称自动选择 Client
-        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
+        if model_to_use.startswith("ecnu-"):
+            client_to_use = self.ecnu_client
+        elif model_to_use.startswith("glm-"):
+            # 临时创建 GLM Client，避免在 __init__ 中硬编码
+            client_to_use = OpenAI(api_key=self.glm_api_key, base_url=self.glm_base_url)
+        else:
+            client_to_use = self.client
 
         def _sync_call():
             return client_to_use.chat.completions.create(**params)
@@ -200,9 +207,9 @@ class AdvancedRetrievalAgent(ModelProvider):
         )
         answer = self._extract_answer(response_raw)
 
-        # 2. 兜底策略：如果回答 Unknown 或为空，使用 ecnu-reasoner 进行深度思考
+        # 2. 兜底策略：如果回答 Unknown 或为空，使用 glm-4.7 进行深度思考
         if not answer or answer.lower() == "unknown" or "empty response" in answer.lower():
-            print(f"[Debug] Initial attempt failed for: {question}. Trying ecnu-reasoner fallback...")
+            print(f"[Debug] Initial attempt failed for: {question}. Trying glm-4.7 fallback...")
             
             # 自适应策略：如果是因为检索不到，尝试扩大检索范围
             if full_context["total_tokens"] > self.full_context_threshold_tokens:
@@ -225,14 +232,14 @@ class AdvancedRetrievalAgent(ModelProvider):
             # 切换到更强大的推理模型
             response_raw = await self._create_chat_completion(
                 messages=messages,
-                model="ecnu-reasoner",
+                model="glm-4.7",
                 temperature=1,
                 top_p=0.95,
-                max_tokens=16000,
-                timeout=240,
+                max_tokens=20000,
+                timeout=300,
                 response_format={"type": "json_object"},
                 enable_thinking=True,
-                thinking_budget_tokens=8000,
+                thinking_budget_tokens=10000,
             )
             answer = self._extract_answer(response_raw)
 
@@ -275,10 +282,10 @@ class AdvancedRetrievalAgent(ModelProvider):
         )
         messages = [{"role": "user", "content": prompt}]
         try:
-            # 硬编码使用 ecnu-plus 进行查询扩展，以提高召回率
+            # 硬编码使用 ecnu-max 进行查询扩展，以提高召回率
             response = await self._create_chat_completion(
                 messages=messages,
-                model="ecnu-plus",
+                model="ecnu-max",
                 temperature=0.3,
                 max_tokens=150,
                 enable_thinking=False

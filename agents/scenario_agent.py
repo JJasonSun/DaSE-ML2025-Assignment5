@@ -20,51 +20,50 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
 
     def _get_scenario_prompts(self) -> Dict[str, Dict[str, str]]:
         base_system = (
-            "你是一个专注于 {expertise_title} 的高精度检索助手。\n\n"
-            "### 任务：\n"
-            "通过遵循有条理的推理过程，积极调用工具，从提供的“大海”（上下文）中提取准确的“针”（答案）。\n\n"
-            "### 协议：\n"
-            "1. **分析**：将问题分解为核心要求和约束条件。\n"
-            "2. **定位**：在上下文中扫描准确的关键词、代码或实体。信息很可能存在但可能被隐藏。\n"
-            "3. **逐步推理**：{reasoning_instruction}\n"
-            "4. **验证**：将你的发现与问题中的所有约束条件进行交叉引用，以确保 100% 的准确性。\n"
-            "5. **输出**：仅返回一个 JSON 对象：{{\"answer\": \"...\"}}。\n\n"
-            "### 约束条件：\n"
-            "- **无幻觉**：主要使用提供的上下文。但对于逻辑推断（如日期推算星期），请积极进行计算。\n"
-            "- **无对话废话**：不要解释你的过程或为什么信息可能缺失。\n"
-            "- **积极推断**：如果上下文提供了部分线索（如日期），而问题需要基于此的推断结果（如星期几），你必须进行计算，绝对不要因为没有直接提及就返回 Unknown。\n"
-            "- **严格回退**：只有在详尽搜索和计算后信息确实不存在时，才返回 {{\"answer\": \"Unknown\"}}。\n"
-            "- **无解释性失败**：严禁返回类似“上下文未提及...”之类的文本。只需在 JSON 中返回 \"Unknown\"。"
+            "你是一名专注于 {expertise_title} 的严谨检索与推理专家，处于大海捞针场景：从长文本中精准定位并推导答案。\n\n"
+            "【执行协议】\n"
+            "1) 需求拆解：明确问题要素与约束，锁定必须满足的条件。\n"
+            "2) 证据定位：逐段扫描上下文，捕捉关键词/代码/数值/日期等线索，信息可能被分散或遮蔽。\n"
+            "3) 深度推理：{reasoning_instruction} 必要时进行精确的逻辑演绎与数值计算，确保推导过程严密，保证结果精确。\n"
+            "4) 交叉校验：用已知约束验证候选答案，排除矛盾与遗漏。\n"
+            "5) 输出约束：仅返回 JSON：{{\"answer\": \"...\"}}，不得附加其它文本。\n\n"
+            "【严格守则】\n"
+            "- 只依赖提供的上下文和通用推理/计算能力，不引入无关外部知识。\n"
+            "- 不写过程、不做解释；若穷尽检索与计算仍无结果，返回 {{\"answer\": \"Unknown\"}}。\n"
+            "- 信息缺省时先推断再放弃，尤其是日期→星期、数值→运算等，不得因未直述而放弃。"
         )
         
-        user_template = "Context:\n{context}\n\nQuestion: {question}\n\n请以 JSON 格式返回你的答案：{{\"answer\": \"...\"}}"
+        user_template = (
+            "Context:\n{context}\n\nQuestion: {question}\n\n"
+            "仅返回 JSON：{{\"answer\": \"...\"}}，不要附加其它文字。"
+        )
 
         return {
             "encoding": {
                 "system": base_system.format(
                     expertise_title="数据编码与密码学",
-                    reasoning_instruction="识别编码字符串（Base64、Hex 等），确定编码方法，并逐步执行转换。根据上下文验证解码结果。"
+                    reasoning_instruction="识别编码字符串（Base64、Hex 等），确定编码方法，通过逻辑推导完成编码/解码，逐步验证结果与上下文一致。"
                 ),
                 "user": user_template
             },
             "string_analysis": {
                 "system": base_system.format(
                     expertise_title="精准字符串分析",
-                    reasoning_instruction="执行字符级或单词级分析。准确计算出现次数，识别精确位置，或提取子字符串。不要总结或近似。"
+                    reasoning_instruction="执行字符级或单词级分析，通过严密的逻辑完成计数/位置/子串提取，保证精确，不要近似。"
                 ),
                 "user": user_template
             },
             "computation": {
                 "system": base_system.format(
                     expertise_title="数学推理与计算",
-                    reasoning_instruction="提取所有相关的数值。识别所需的运算（加、减、乘、除等）。逐步执行计算，保持精度。仔细处理单位和比例。"
+                    reasoning_instruction="提取所有相关数值，识别所需运算（加/减/乘/除等），通过精确的数学推导完成计算，妥善处理单位与比例。"
                 ),
                 "user": user_template
             },
             "date_time": {
                 "system": base_system.format(
                     expertise_title="时间推理与日历分析",
-                    reasoning_instruction="提取所有相关的日期和时间。如果问题询问星期几但上下文中只有日期，你必须根据日期计算星期几，不可直接返回Unknown。逐步计算时长、截止日期，考虑月份长度和闰年。"
+                    reasoning_instruction="提取所有日期和时间，通过逻辑推算确定星期几/时长/截止日期；如仅给日期需推星期，必须进行推导计算，不可跳过，考虑月份长度与闰年。"
                 ),
                 "user": user_template
             }
@@ -72,12 +71,13 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
 
     async def _classify_scenario(self, question: str) -> Optional[str]:
         classification_prompt = (
-            "你是一个分类助手。请将问题归类为以下四种类型之一，并给出置信度（0-100%）：\n\n"
-            "1. encoding: 解码 Base64、Hex 或密码。（例如：'Decode the message 50484F454E4958363335', 'Using Roman military encryption, decode XMXER552'）\n"
-            "2. string_analysis: 字符/单词计数、位置或子字符串分析。（例如：'Calculate the sum of all numeric digits in the token string', 'Calculate the absolute difference between occurrences of a and E'）\n"
-            "3. computation: 涉及大数或多个步骤的数学计算。（例如：'Calculate the precise quarterly budget amount', 'Subtract verified coordinates from total and multiply by multiplier'）\n"
-            "4. date_time: 日期、星期几、时长或截止日期。（例如：'What day of the week will it go live?', 'How many days between milestone completion and report deadline?'）\n\n"
-            "请以 JSON 格式返回，包含 'category' 和 'confidence' 字段。如果不确定，'category' 返回 'none'。\n\n"
+            "你是一个精确分类助手，请基于问题语义判定所属场景，并给出置信度（0-100%）。\n\n"
+            "类别定义：\n"
+            "1. encoding: 解码 Base64/Hex/密码。\n"
+            "2. string_analysis: 字符/单词计数、位置或子串分析。\n"
+            "3. computation: 多步或大数计算。\n"
+            "4. date_time: 日期、星期几、时长、截止日期计算。\n\n"
+            "输出：仅返回 JSON，含 'category' 与 'confidence'。若不确定，category=none。\n\n"
             f"问题: {question}\n\n"
             "JSON:"
         )
@@ -95,7 +95,14 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
         )
         
         try:
-            data = json.loads(response)
+            # 处理可能包含 Markdown 代码块的情况
+            clean_response = response.strip()
+            if "```" in clean_response:
+                match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_response, re.DOTALL)
+                if match:
+                    clean_response = match.group(1)
+            
+            data = json.loads(clean_response)
             category = data.get("category", "none").lower()
             confidence = data.get("confidence", 0)
             
