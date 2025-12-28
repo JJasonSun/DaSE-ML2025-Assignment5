@@ -9,6 +9,7 @@ import requests
 import tiktoken
 from dotenv import load_dotenv
 from openai import OpenAI
+from rank_bm25 import BM25Okapi
 
 from model import ModelProvider
 
@@ -58,13 +59,13 @@ class AdvancedRetrievalAgent(ModelProvider):
             "system_prompt": (
                 "你是一个高精度的检索助手。你的目标是从提供的上下文中提取准确的答案。\n\n"
                 "### 关键指令：\n"
-                "1. **精准与依据**：仅使用提供的上下文。不要使用外部知识。在内部推理过程中引用或参考上下文的具体部分。\n"
-                "2. **逐步推理**：有条理地分析问题和上下文。将复杂问题分解为逻辑子步骤（例如：定位实体 -> 查找日期 -> 计算差值）。\n"
-                "3. **坚持不懈**：在得出信息缺失的结论之前，穷尽上下文中所有的可能性。\n"
+                "1. **精准与依据**：主要依据提供的上下文。对于上下文中提到的日期但未明确给出星期几的情况，你必须积极进行推断和计算（例如已知日期推算星期几），不要因为上下文中没有直接写明星期几就认为未知。不要使用与上下文无关的外部知识，但可以运用通用的逻辑和计算能力。\n"
+                "2. **逐步推理**：有条理地分析问题和上下文。将复杂问题分解为逻辑子步骤（例如：定位实体 -> 查找日期 -> 计算差值/推算星期）。\n"
+                "3. **坚持不懈**：在得出信息缺失的结论之前，积极调用工具，穷尽上下文中所有的可能性。只要有相关线索，就要积极推理。\n"
                 "4. **输出格式**：仅返回一个包含 \"answer\" 键的 JSON 对象。\n"
-                "5. **无对话废话**：不要解释为什么找不到答案，也不要提供任何前导说明。如果经过详尽搜索后答案确实不存在，请将 \"answer\" 设置为 \"Unknown\"。\n\n"
+                "5. **无对话废话**：不要解释为什么找不到答案，也不要提供任何前导说明。如果经过详尽搜索和计算后答案确实不存在，请将 \"answer\" 设置为 \"Unknown\"。\n\n"
                 "### 约束条件：\n"
-                "- 如果找到了答案，请简洁地提供。\n"
+                "- 如果找到了答案（包括通过计算得出的），请简洁地提供。\n"
                 "- 如果未找到答案，返回 {\"answer\": \"Unknown\"}。\n"
                 "- 严禁在 JSON 之外输出类似“信息未指定”之类的文本。"
             ),
@@ -451,42 +452,44 @@ class AdvancedRetrievalAgent(ModelProvider):
         if not keywords or not chunks:
             return {}
 
-        tokenized_chunks: List[List[str]] = []
-        df: Dict[str, int] = {}
-        for chunk in chunks:
-            # 保留形如 AF-PROJ-8876 / ARC-7F3B-92E4 的连字符编码
-            words = re.findall(r"[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*", chunk["text"].lower())
-            tokenized_chunks.append(words)
-            for w in set(words):
-                df[w] = df.get(w, 0) + 1
-
-        N = len(chunks)
-        avgdl = sum(len(c) for c in tokenized_chunks) / max(N, 1)
-        k1, b = 1.5, 0.75
-
+        # 使用 rank_bm25 库进行优化
+        tokenized_chunks = [self._tokenize(chunk["text"]) for chunk in chunks]
+        bm25 = BM25Okapi(tokenized_chunks)
+        
+        # 针对每个关键词计算得分并累加
+        # 注意：rank_bm25 的 get_scores 是针对整个 query 的，这里我们需要手动组合
+        # 或者更简单地，直接将 keywords 作为一个 query 传入
+        # 但为了保留原来的权重逻辑（特定关键词加权），我们可能需要手动处理
+        
         scores: Dict[int, float] = {}
-        for idx, words in enumerate(tokenized_chunks):
-            tf: Dict[str, int] = {}
-            for w in words:
-                tf[w] = tf.get(w, 0) + 1
+        # 初始化所有 chunks 的分数为 0
+        for i in range(len(chunks)):
+            scores[i] = 0.0
 
-            dl = len(words)
-            score = 0.0
-            for kw in keywords:
-                term = kw.lower()
-                if term not in tf:
-                    continue
+        for kw in keywords:
+            term = kw.lower()
+            weight = 2.0 if ("-" in term or ":" in term or any(c.isdigit() for c in term)) else 1.0
+            
+            # 简单的分词，保持与 _tokenize 一致
+            tokenized_query = self._tokenize(term)
+            if not tokenized_query:
+                continue
                 
-                # 权重增强：如果关键词包含连字符、数字或特殊符号，通常是“针”的关键特征，给予 2 倍权重
-                weight = 2.0 if ("-" in term or ":" in term or any(c.isdigit() for c in term)) else 1.0
-                
-                df_t = df.get(term, 0)
-                idf = math.log((N - df_t + 0.5) / (df_t + 0.5) + 1)
-                numer = tf[term] * (k1 + 1)
-                denom = tf[term] + k1 * (1 - b + b * dl / max(avgdl, 1e-6))
-                score += weight * idf * numer / max(denom, 1e-6)
-            scores[idx] = score
+            # 获取该关键词在所有文档中的得分
+            # BM25Okapi.get_scores 接受的是 token 列表作为 query
+            # 但这里我们想对每个 keyword 单独加权，所以分别计算
+            kw_scores = bm25.get_scores(tokenized_query)
+            
+            for i, score in enumerate(kw_scores):
+                if score > 0:
+                    scores[i] += score * weight
+                    
         return scores
+
+    def _tokenize(self, text: str) -> List[str]:
+        # 改进的分词：保留连字符、数字、字母
+        # 移除停用词逻辑可以放在这里或者调用处，BM25 通常不需要严格移除停用词，因为高频词 IDF 低
+        return re.findall(r"[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*", text.lower())
 
     def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
         dot = 0.0

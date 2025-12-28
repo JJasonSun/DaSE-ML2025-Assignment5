@@ -22,7 +22,7 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
         base_system = (
             "你是一个专注于 {expertise_title} 的高精度检索助手。\n\n"
             "### 任务：\n"
-            "通过遵循有条理的推理过程，从提供的“大海”（上下文）中提取准确的“针”（答案）。\n\n"
+            "通过遵循有条理的推理过程，积极调用工具，从提供的“大海”（上下文）中提取准确的“针”（答案）。\n\n"
             "### 协议：\n"
             "1. **分析**：将问题分解为核心要求和约束条件。\n"
             "2. **定位**：在上下文中扫描准确的关键词、代码或实体。信息很可能存在但可能被隐藏。\n"
@@ -30,9 +30,10 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
             "4. **验证**：将你的发现与问题中的所有约束条件进行交叉引用，以确保 100% 的准确性。\n"
             "5. **输出**：仅返回一个 JSON 对象：{{\"answer\": \"...\"}}。\n\n"
             "### 约束条件：\n"
-            "- **无幻觉**：仅使用提供的上下文。\n"
+            "- **无幻觉**：主要使用提供的上下文。但对于逻辑推断（如日期推算星期），请积极进行计算。\n"
             "- **无对话废话**：不要解释你的过程或为什么信息可能缺失。\n"
-            "- **严格回退**：只有在详尽搜索后信息确实不存在时，才返回 {{\"answer\": \"Unknown\"}}。\n"
+            "- **积极推断**：如果上下文提供了部分线索（如日期），而问题需要基于此的推断结果（如星期几），你必须进行计算，绝对不要因为没有直接提及就返回 Unknown。\n"
+            "- **严格回退**：只有在详尽搜索和计算后信息确实不存在时，才返回 {{\"answer\": \"Unknown\"}}。\n"
             "- **无解释性失败**：严禁返回类似“上下文未提及...”之类的文本。只需在 JSON 中返回 \"Unknown\"。"
         )
         
@@ -63,7 +64,7 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
             "date_time": {
                 "system": base_system.format(
                     expertise_title="时间推理与日历分析",
-                    reasoning_instruction="提取所有相关的日期和时间。逐步计算时长、截止日期或特定的星期几，考虑月份长度和闰年。"
+                    reasoning_instruction="提取所有相关的日期和时间。如果问题询问星期几但上下文中只有日期，你必须根据日期计算星期几，不可直接返回Unknown。逐步计算时长、截止日期，考虑月份长度和闰年。"
                 ),
                 "user": user_template
             }
@@ -71,14 +72,14 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
 
     async def _classify_scenario(self, question: str) -> Optional[str]:
         classification_prompt = (
-            "你是一个分类助手。请将问题归类为以下四种类型之一：\n\n"
+            "你是一个分类助手。请将问题归类为以下四种类型之一，并给出置信度（0-100%）：\n\n"
             "1. encoding: 解码 Base64、Hex 或密码。（例如：'Decode the message 50484F454E4958363335', 'Using Roman military encryption, decode XMXER552'）\n"
             "2. string_analysis: 字符/单词计数、位置或子字符串分析。（例如：'Calculate the sum of all numeric digits in the token string', 'Calculate the absolute difference between occurrences of a and E'）\n"
             "3. computation: 涉及大数或多个步骤的数学计算。（例如：'Calculate the precise quarterly budget amount', 'Subtract verified coordinates from total and multiply by multiplier'）\n"
             "4. date_time: 日期、星期几、时长或截止日期。（例如：'What day of the week will it go live?', 'How many days between milestone completion and report deadline?'）\n\n"
-            "仅返回类别名称（encoding, string_analysis, computation 或 date_time）。如果不确定，返回 'none'。\n\n"
+            "请以 JSON 格式返回，包含 'category' 和 'confidence' 字段。如果不确定，'category' 返回 'none'。\n\n"
             f"问题: {question}\n\n"
-            "类别:"
+            "JSON:"
         )
         
         messages = [{"role": "user", "content": classification_prompt}]
@@ -88,16 +89,36 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
             messages=messages,
             model="ecnu-max",
             temperature=0,
-            max_tokens=10,
-            enable_thinking=False
+            max_tokens=100,
+            enable_thinking=False,
+            response_format={"type": "json_object"}
         )
         
-        category = response.strip().lower()
-        # 鲁棒性解析：检查返回字符串中是否包含关键字
-        valid_categories = ["encoding", "string_analysis", "computation", "date_time"]
-        for cat in valid_categories:
-            if cat in category:
-                return cat
+        try:
+            data = json.loads(response)
+            category = data.get("category", "none").lower()
+            confidence = data.get("confidence", 0)
+            
+            # 将置信度归一化为 0-1
+            if isinstance(confidence, str) and "%" in confidence:
+                confidence = float(confidence.strip("%")) / 100
+            elif isinstance(confidence, (int, float)) and confidence > 1:
+                confidence = confidence / 100
+                
+            print(f"[Scenario] Classification: {category}, Confidence: {confidence}")
+
+            # 只有当置信度足够高时才采纳分类结果
+            if confidence >= 0.7:
+                valid_categories = ["encoding", "string_analysis", "computation", "date_time"]
+                for cat in valid_categories:
+                    if cat in category:
+                        return cat
+            else:
+                print(f"[Scenario] Confidence too low ({confidence}), falling back to default.")
+                
+        except Exception as e:
+            print(f"[Scenario] Classification parsing failed: {e}")
+            
         return None
 
     async def evaluate_model(self, prompt: Dict) -> str:

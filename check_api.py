@@ -45,7 +45,7 @@ if not model_name.lower().startswith("ecnu"):
 completion = client.chat.completions.create(
     model=model_name,
     messages=[
-        {"role": "system", "content": "你是一个高精度的检索和计算助手。请根据提供的上下文回答问题，并使用中文回答,直接给出最终答案。"},
+        {"role": "system", "content": "你是一个高精度的检索和计算助手。请根据提供的上下文回答问题，积极调用工具，直接给出最终答案。"},
         {"role": "user", "content": """Context:
 1. Asset Vault Alpha contains a critical resource count of 4931305872608785 units. Security clearance level: OMEGA.
 2. Operational Database Beta tracks emergency reserves at 4106935655129089 units. Classification: EYES ONLY.
