@@ -39,9 +39,6 @@ class AdvancedRetrievalAgent(ModelProvider):
         self.ecnu_base_url = (os.getenv("ECNU_BASE_URL") or self.base_url).rstrip("/")
         self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
 
-        self.glm_api_key = os.getenv("GLM_API_KEY")
-        self.glm_base_url = (os.getenv("GLM_BASE_URL") or "https://open.bigmodel.cn/api/coding/paas/v4").rstrip("/")
-
         self.embedding_model = "ecnu-embedding-small"
         self.rerank_model = "ecnu-rerank"
 
@@ -65,8 +62,8 @@ class AdvancedRetrievalAgent(ModelProvider):
                 "1) 专注依据：只使用提供的上下文与通用推理/计算能力，禁止引入无关外部知识。\n"
                 "2) 结构化思考：先拆解问题，再定位线索，逐步演绎，验证约束。\n"
                 "3) 积极求解：遇到日期需推算星期、数值需运算时，积极执行深度推导计算，并保证准确。\n"
-                "4) 结果唯一：仅输出一个 JSON 对象，形如 {\"answer\": \"...\"}。\n"
-                "5) 零赘述：不叙述过程，不解释缺失。若穷尽检索与计算仍无结果，返回 {\"answer\": \"Unknown\"}。\n"
+                "4) 输出策略：若答案确定，严格遵守零赘述，仅输出 JSON 对象 {{\"answer\": \"...\"}}。若答案不确定，请输出详细的推理过程，并在最后附上 JSON 结论。\n"
+                "5) 结果兜底：若穷尽检索与计算仍无结果，请列出已找到的相关信息片段和推理过程，说明缺失环节，最后返回 {{\"answer\": \"Unknown\"}}。\n"
                 "6) 容错与坚持：信息被遮蔽、分散或需跨段推理时，保持耐心与严密逻辑，避免遗漏。\n\n"
                 "【简要流程】分析需求 → 搜索/对齐证据 → 必要时执行精确计算 → 交叉校验 → 输出 JSON。"
             ),
@@ -114,13 +111,7 @@ class AdvancedRetrievalAgent(ModelProvider):
             params["extra_body"] = extra_body
 
         # 根据模型名称自动选择 Client
-        if model_to_use.startswith("ecnu-"):
-            client_to_use = self.ecnu_client
-        elif model_to_use.startswith("glm-"):
-            # 临时创建 GLM Client，避免在 __init__ 中硬编码
-            client_to_use = OpenAI(api_key=self.glm_api_key, base_url=self.glm_base_url)
-        else:
-            client_to_use = self.client
+        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
 
         def _sync_call():
             return client_to_use.chat.completions.create(**params)
@@ -207,9 +198,9 @@ class AdvancedRetrievalAgent(ModelProvider):
         )
         answer = self._extract_answer(response_raw)
 
-        # 2. 兜底策略：如果回答 Unknown 或为空，使用 glm-4.7 进行深度思考
+        # 2. 兜底策略：如果回答 Unknown 或为空，使用 ecnu-reasoner 进行深度思考
         if not answer or answer.lower() == "unknown" or "empty response" in answer.lower():
-            print(f"[Debug] Initial attempt failed for: {question}. Trying glm-4.7 fallback...")
+            print(f"[Debug] Initial attempt failed for: {question}. Trying ecnu-reasoner fallback...")
             
             # 自适应策略：如果是因为检索不到，尝试扩大检索范围
             if full_context["total_tokens"] > self.full_context_threshold_tokens:
@@ -230,18 +221,24 @@ class AdvancedRetrievalAgent(ModelProvider):
                 ]
 
             # 切换到更强大的推理模型
+            # 注意：兜底时不再强制 JSON 格式，允许输出推理过程
             response_raw = await self._create_chat_completion(
                 messages=messages,
-                model="glm-4.7",
+                model="ecnu-reasoner",
                 temperature=1,
                 top_p=0.95,
-                max_tokens=20000,
-                timeout=300,
-                response_format={"type": "json_object"},
+                max_tokens=16000,
+                timeout=240,
+                # response_format={"type": "json_object"}, # 移除强制 JSON 约束
                 enable_thinking=True,
-                thinking_budget_tokens=10000,
+                thinking_budget_tokens=8000,
             )
+            # 尝试提取答案，如果提取失败（非 JSON），则直接使用原始内容作为答案（即推理过程）
             answer = self._extract_answer(response_raw)
+            if not answer or answer.lower() == "unknown":
+                 answer = response_raw
+
+        return (answer or "Unknown").strip()
 
         return (answer or "Unknown").strip()
 
