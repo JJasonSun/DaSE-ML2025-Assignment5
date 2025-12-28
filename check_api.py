@@ -45,14 +45,8 @@ if not model_name.lower().startswith("ecnu"):
 completion = client.chat.completions.create(
     model=model_name,
     messages=[
-        {"role": "system", "content": "你是一个高精度的检索和计算助手。请根据提供的上下文回答问题，直接给出最终答案。"},
-        {"role": "user", "content": """Context:
-1. Asset Vault Alpha contains a critical resource count of 4931305872608785 units. Security clearance level: OMEGA.
-2. Operational Database Beta tracks emergency reserves at 4106935655129089 units. Classification: EYES ONLY.
-3. Strategic multiplier designation GAMMA-394 must be applied to all differential calculations.
-4. The contingency divisor ZETA-41 is authorized for final resource allocation.
-
-Question: As the lead resource coordinator for Project Chimera, you need to calculate the final emergency deployment allocation. Access the classified asset vault numbers (Alpha and Beta), determine the resource differential, apply the strategic multiplier Gamma, then divide by the contingency divisor Zeta using integer division. What is the precise deployment figure? 请使用中文回答。"""}
+        {"role": "system", "content": "你是一个有帮助的助手。"},
+        {"role": "user", "content": "介绍一下自己。"}
     ],
     top_p=0.95,
     temperature=1,
