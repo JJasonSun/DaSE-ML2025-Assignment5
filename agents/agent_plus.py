@@ -3,7 +3,7 @@ import json
 import math
 import os
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import requests
 import tiktoken
@@ -62,14 +62,14 @@ class AdvancedRetrievalAgent(ModelProvider):
                 "1) 专注依据：只使用提供的上下文与通用推理/计算能力，禁止引入无关外部知识。\n"
                 "2) 结构化思考：先拆解问题，再定位线索，逐步演绎，验证约束。\n"
                 "3) 积极求解：遇到日期需推算星期、数值需运算时，积极执行深度推导计算，并保证准确。\n"
-                "4) 输出策略：若答案确定，严格遵守零赘述，仅输出 JSON 对象 {{\"answer\": \"...\"}}。若答案不确定，请输出详细的推理过程，并在最后附上 JSON 结论。\n"
-                "5) 结果兜底：若穷尽检索与计算仍无结果，请列出已找到的相关信息片段和推理过程，说明缺失环节，最后返回 {{\"answer\": \"Unknown\"}}。\n"
+                "4) 输出策略：请先明确给出最终答案，然后输出关键的推理过程和相关信息。\n"
+                "5) 结果兜底：若穷尽检索与计算仍无结果，请直接返回 \"Unknown\"。\n"
                 "6) 容错与坚持：信息被遮蔽、分散或需跨段推理时，保持耐心与严密逻辑，避免遗漏。\n\n"
-                "【简要流程】分析需求 → 搜索/对齐证据 → 必要时执行精确计算 → 交叉校验 → 输出 JSON。"
+                "【简要流程】分析需求 → 搜索/对齐证据 → 必要时执行精确计算 → 交叉校验 → 先输出答案再输出推理过程。"
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "请以 JSON 返回最终答案：{{\"answer\": \"...\"}}"
+                "请给出你的分析和答案。"
             ),
         }
 
@@ -140,7 +140,7 @@ class AdvancedRetrievalAgent(ModelProvider):
                 return content.strip()
             
             # 如果 content 为空但有 reasoning_content，可能是因为思维链过长导致截断
-            # 尝试返回思维链内容，以便 _extract_answer 尝试从中解析答案
+            # 尝试返回思维链内容作为回答
             if isinstance(reasoning, str) and reasoning.strip():
                 print(f"[Debug] Content is empty, but reasoning_content found (finish_reason: {finish_reason})")
                 return reasoning.strip()
@@ -149,18 +149,7 @@ class AdvancedRetrievalAgent(ModelProvider):
         except Exception as e:
             return f"Response parsing error: {str(e)[:80]}"
 
-    def _extract_answer(self, response_raw: str) -> str:
-        try:
-            clean_raw = response_raw.strip()
-            if "```" in clean_raw:
-                m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_raw, re.DOTALL)
-                if m:
-                    clean_raw = m.group(1)
-            data = json.loads(clean_raw)
-            return str(data.get("answer", "")).strip()
-        except Exception:
-            m = re.search(r'"answer"\s*:\s*"([^"]*)"', response_raw)
-            return (m.group(1).strip() if m else response_raw.strip())
+
 
     # -------------------------- ModelProvider API -------------------------- #
     async def evaluate_model(self, prompt: Dict) -> str:
@@ -185,21 +174,24 @@ class AdvancedRetrievalAgent(ModelProvider):
             {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
         ]
 
-        # 全部调用思考模式，增加 tokens 预算以允许充分思考
+        # 1. 第一次尝试
         response_raw = await self._create_chat_completion(
             messages=messages,
             temperature=1,
             top_p=0.95,
             max_tokens=16000,
             timeout=180,
-            response_format={"type": "json_object"},
+            # response_format={"type": "json_object"}, # REMOVED
             enable_thinking=True,
             thinking_budget_tokens=8000,
         )
-        answer = self._extract_answer(response_raw)
+        answer = response_raw.strip()
 
-        # 2. 兜底策略：如果回答 Unknown 或为空，使用 ecnu-reasoner 进行深度思考
-        if not answer or answer.lower() == "unknown" or "empty response" in answer.lower():
+        # 2. 兜底策略
+        # 判断是否为 Unknown (宽松判断)
+        is_unknown = answer.lower() == "unknown" or (len(answer) < 20 and "unknown" in answer.lower()) or "empty response" in answer.lower()
+
+        if not answer or is_unknown:
             print(f"[Debug] Initial attempt failed for: {question}. Trying ecnu-reasoner fallback...")
             
             # 自适应策略：如果是因为检索不到，尝试扩大检索范围
@@ -214,14 +206,21 @@ class AdvancedRetrievalAgent(ModelProvider):
                 context_for_llm = evidence["evidence_text"]
                 self.rerank_top_n = orig_top_n
 
-                # 更新消息中的上下文
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
-                ]
+            # 构建兜底专用的 System Prompt
+            fallback_system_prompt = (
+                "你是一名严谨的长文检索与推理专家。之前的尝试未能找到确切答案。\n"
+                "请仔细重新分析上下文，列出所有你认为可能相关的片段和线索。\n"
+                "展示你的推理过程，说明为什么这些线索不足以得出确切答案，或者尝试进行合理的推断。\n"
+                "【重要】即使无法确定，也不要只输出 'Unknown'，必须提供详细的分析过程和相关数据。"
+            )
+
+            # 更新消息中的上下文
+            messages = [
+                {"role": "system", "content": fallback_system_prompt},
+                {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
+            ]
 
             # 切换到更强大的推理模型
-            # 注意：兜底时不再强制 JSON 格式，允许输出推理过程
             response_raw = await self._create_chat_completion(
                 messages=messages,
                 model="ecnu-reasoner",
@@ -229,18 +228,13 @@ class AdvancedRetrievalAgent(ModelProvider):
                 top_p=0.95,
                 max_tokens=16000,
                 timeout=240,
-                # response_format={"type": "json_object"}, # 移除强制 JSON 约束
+                # response_format={"type": "json_object"}, # REMOVED
                 enable_thinking=True,
                 thinking_budget_tokens=8000,
             )
-            # 尝试提取答案，如果提取失败（非 JSON），则直接使用原始内容作为答案（即推理过程）
-            answer = self._extract_answer(response_raw)
-            if not answer or answer.lower() == "unknown":
-                 answer = response_raw
+            answer = response_raw.strip()
 
-        return (answer or "Unknown").strip()
-
-        return (answer or "Unknown").strip()
+        return answer
 
     def generate_prompt(self, **kwargs) -> Dict:
         return {"context_data": kwargs.get("context_data"), "question": kwargs.get("question")}
