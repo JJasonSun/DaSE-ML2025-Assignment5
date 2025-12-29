@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 import tiktoken
 import re
 import os
+import json
 import asyncio
 from dotenv import load_dotenv
 from openai import OpenAI

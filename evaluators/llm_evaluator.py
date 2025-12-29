@@ -30,10 +30,13 @@ Score 10: The answer is completely accurate and matches the ground truth.
         # 2. Agent 配置 (Fallback)
         self.agent_api_key = api_key
         self.agent_base_url = base_url
-        self.agent_model_name = os.getenv('MODEL_NAME')
+        self.agent_model_name = os.getenv('MODEL_NAME') or "ecnu-max"
 
     def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
         """封装 API 调用逻辑。"""
+        if not model:
+            return None
+
         extra_body = {}
         # 评测时统一禁用思考模式，以获得快速且直接的分数输出
         if not model.lower().startswith("ecnu"):
