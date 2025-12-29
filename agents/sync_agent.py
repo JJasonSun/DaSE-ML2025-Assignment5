@@ -1,6 +1,11 @@
 from typing import List, Dict, Optional
 import tiktoken
 import re
+import os
+import json
+import asyncio
+from dotenv import load_dotenv
+from openai import OpenAI
 from model import ModelProvider
 
 class SyncRetrievalAgent(ModelProvider):
@@ -18,9 +23,105 @@ class SyncRetrievalAgent(ModelProvider):
 
     def __init__(self, api_key: str, base_url: str):
         super().__init__(api_key, base_url)
-        self.tokenizer = tiktoken.encoding_for_model("gpt-4") # 使用 GPT-4 的编码器
-        self.max_tokens_per_request = 512  # 提高上限以覆盖更多上下文
-        self.top_k_files = 5  # 从 3 提升至 5
+        load_dotenv()
+        self.api_key = api_key
+        self.base_url = base_url.rstrip('/')
+        self.model_name = os.getenv('MODEL_NAME') or "ecnu-max"
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+
+        self.ecnu_api_key = os.getenv("ECNU_API_KEY") or self.api_key
+        self.ecnu_base_url = (os.getenv("ECNU_BASE_URL") or self.base_url).rstrip("/")
+        self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
+
+        self.tokenizer = tiktoken.encoding_for_model("gpt-4")
+        self.max_tokens_per_request = 512
+        self.top_k_files = 5
+
+    async def _create_chat_completion(
+        self,
+        messages: List[Dict],
+        model: Optional[str] = None,
+        temperature: float = 0,
+        max_tokens: int = 800,
+        timeout: int = 60,
+        response_format: Optional[Dict] = None,
+        enable_thinking: bool = False,
+        thinking_budget_tokens: int = 1024,
+        top_p: float = 1.0,
+    ) -> str:
+        model_to_use = model or self.model_name
+        params: Dict = {
+            "model": model_to_use,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+            "top_p": top_p,
+        }
+        if response_format:
+            params["response_format"] = response_format
+
+        extra_body: Dict = {}
+        # 仅对非 ecnu 模型（即主回答模型）应用思考模式配置
+        if not model_to_use.startswith("ecnu-"):
+            if enable_thinking:
+                print(f"本次任务对模型 {model_to_use} 开启深度思考")
+                extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
+            else:
+                extra_body["thinking"] = {"type": "disabled"}
+        
+        if extra_body:
+            params["extra_body"] = extra_body
+
+        # 根据模型名称自动选择 Client
+        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
+
+        def _sync_call():
+            return client_to_use.chat.completions.create(**params)
+
+        try:
+            try:
+                completion = await asyncio.to_thread(_sync_call)
+            except AttributeError:
+                loop = asyncio.get_running_loop()
+                completion = await loop.run_in_executor(None, _sync_call)
+            raw = completion.to_dict()
+            print(f"[Debug] Raw response: {raw}")
+            return self._extract_content_from_response(raw)
+        except Exception as exc:
+            return f"API error: {exc}" if exc else "API error"
+
+    def _extract_content_from_response(self, result: dict) -> str:
+        try:
+            choice = result.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            content = message.get("content", "")
+            reasoning = message.get("reasoning_content", "")
+            finish_reason = choice.get("finish_reason", "unknown")
+
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+            
+            if isinstance(reasoning, str) and reasoning.strip():
+                print(f"[Debug] Content is empty, but reasoning_content found (finish_reason: {finish_reason})")
+                return reasoning.strip()
+
+            return f"Empty response (finish_reason: {finish_reason})"
+        except Exception as e:
+            return f"Response parsing error: {str(e)[:80]}"
+
+    def _extract_answer(self, response_raw: str) -> str:
+        try:
+            clean_raw = response_raw.strip()
+            if "```" in clean_raw:
+                m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", clean_raw, re.DOTALL)
+                if m:
+                    clean_raw = m.group(1)
+            data = json.loads(clean_raw)
+            return str(data.get("answer", "")).strip()
+        except Exception:
+            m = re.search(r'"answer"\s*:\s*"([^"]*)"', response_raw)
+            return (m.group(1).strip() if m else response_raw.strip())
 
     async def evaluate_model(self, prompt: Dict) -> str:
         """
@@ -54,9 +155,12 @@ class SyncRetrievalAgent(ModelProvider):
             # 使用基类的API调用方法，增加 max_tokens 以应对推理模型
             response = await self._create_chat_completion(
                 messages=messages,
-                temperature=0,
-                max_tokens=1500,
-                timeout=30
+                temperature=1,
+                top_p=0.95,
+                max_tokens=8000,
+                timeout=180,
+                enable_thinking=True,
+                thinking_budget_tokens=4000
             )
             
             # 如果响应为空或包含错误信息，尝试备用策略
@@ -75,26 +179,14 @@ class SyncRetrievalAgent(ModelProvider):
                 response = await self._create_chat_completion(
                     messages=backup_messages,
                     temperature=0.1,
-                    max_tokens=100,
-                    timeout=15
+                    max_tokens=500,
+                    timeout=30,
+                    enable_thinking=False
                 )
             
             # 最终检查和清理响应
             if response and response.strip():
-                cleaned_response = response.strip()
-                # 移除可能的前缀和后缀
-                prefixes_to_remove = ['答案：', 'Answer:', 'The answer is', 'Based on', 'According to']
-                for prefix in prefixes_to_remove:
-                    if cleaned_response.startswith(prefix):
-                        cleaned_response = cleaned_response[len(prefix):].strip()
-                        if cleaned_response.startswith(':'):
-                            cleaned_response = cleaned_response[1:].strip()
-                
-                # 移除句号等标点符号（如果答案是单个词）
-                if len(cleaned_response.split()) == 1:
-                    cleaned_response = cleaned_response.rstrip('.,!?;')
-                
-                return cleaned_response
+                return self._extract_answer(response)
             else:
                 return "无法生成有效回答"
                 

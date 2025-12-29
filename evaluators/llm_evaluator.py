@@ -1,82 +1,114 @@
-import os
-import re
-from dotenv import load_dotenv
+﻿import os
 from openai import OpenAI
 from typing import Dict
 from .evaluator import Evaluator
 
 
 class LLMEvaluator(Evaluator):
-    """使用 LLM 依据标准答案进行打分的评测器。"""
+    """Evaluator that uses LLM to score responses against ground truth."""
 
     CRITERIA: Dict[str, str] = {
         "accuracy": """
-得分 0：回答与问题无关或完全错误。
-得分 3：略有相关性但存在明显错误。
-得分 5：部分正确但缺少关键信息。
-得分 7：基本正确，仅有少量遗漏。
-得分 10：完全准确并与标准答案一致。
+Score 0: The answer is completely wrong or unrelated.
+Score 3: The answer has minor relevance but contains major inaccuracies.
+Score 5: The answer is partially correct but missing key information.
+Score 7: The answer is mostly correct with minor omissions.
+Score 10: The answer is completely accurate and matches the ground truth.
 """
     }
 
-    def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str, model_name: str = None):
-        """初始化基于 LLM 的评测器。"""
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+    def __init__(self, api_key: str, base_url: str, ground_truth: str, question: str):
+        """Initialize the LLM evaluator."""
         self.ground_truth = ground_truth
         self.question = question
         
-        if model_name is None:
-            load_dotenv()
-            self.model_name = os.getenv('TEST_MODEL', os.getenv('MODEL_NAME', 'ecnu-max'))
-        else:
-            self.model_name = model_name
+        # 1. 评测专用配置 (Primary)
+        self.eval_api_key = os.getenv('EVAL_API_KEY')
+        self.eval_base_url = os.getenv('EVAL_BASE_URL')
+        self.eval_model_name = os.getenv('EVAL_MODEL_NAME')
+        
+        # 2. Agent 配置 (Fallback)
+        self.agent_api_key = api_key
+        self.agent_base_url = base_url
+        self.agent_model_name = os.getenv('MODEL_NAME') or "ecnu-max"
+
+    def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
+        """封装 API 调用逻辑。"""
+        if not model:
+            return None
+
+        extra_body = {}
+        # 评测时统一禁用思考模式，以获得快速且直接的分数输出
+        if not model.lower().startswith("ecnu"):
+            extra_body = {
+                "thinking": {
+                    "type": "disabled"
+                }
+            }
+
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system",
+                 "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0,
+            max_tokens=10,
+            extra_body=extra_body if extra_body else None
+        )
+        if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
+            return None
+        return completion.choices[0].message.content.strip()
 
     def evaluate_response(self, response: str) -> int:
-        """调用 LLM 对回答进行评估打分。"""
-        evaluation_prompt = f"""你是一名资深评测员，请根据回答与标准答案的匹配程度打分。
+        """Evaluate a response using LLM."""
+        evaluation_prompt = f"""You are an expert evaluator. Your task is to score the answer based on how well it matches the ground truth.
 
-问题：{self.question}
-标准答案：{self.ground_truth}
-模型回答：{response}
+Question: {self.question}
+Ground Truth Answer: {self.ground_truth}
+Answer: {response}
 
-评分标准：
+Scoring Criteria:
 {self.CRITERIA['accuracy']}
 
-请直接返回 0-10 的单个数字，不要包含任何解释或额外内容。"""
+Please evaluate the answer and respond with ONLY a single number from 0 to 10. Do not include any explanation or other text."""
 
+        score_text = None
+        
+        # 1. 尝试评测专用模型
+        if self.eval_api_key and self.eval_base_url and self.eval_model_name:
+            try:
+                eval_client = OpenAI(api_key=self.eval_api_key, base_url=self.eval_base_url)
+                score_text = self._call_api(eval_client, self.eval_model_name, evaluation_prompt)
+            except Exception as e:
+                print(f"Evaluation model ({self.eval_model_name}) failed: {e}")
+
+        # 2. 兜底策略：使用 Agent 的 API
+        if score_text is None:
+            print(f"Switching to Agent API for evaluation fallback")
+            try:
+                agent_client = OpenAI(api_key=self.agent_api_key, base_url=self.agent_base_url)
+                score_text = self._call_api(agent_client, self.agent_model_name, evaluation_prompt)
+            except Exception as e:
+                print(f"Agent API evaluation failed: {e}")
+
+        if score_text is None:
+            return 0
+
+        # 3. 解析分数
         try:
-            # 增加 max_tokens 并尝试禁用某些模型的推理模式（如果支持）
-            completion = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system",
-                     "content": "你是一名评测员。你的任务是直接输出一个 0 到 10 之间的整数评分，严禁输出任何推理过程或解释。"},
-                    {"role": "user", "content": evaluation_prompt}
-                ],
-                temperature=0,
-                max_tokens=100  # 增加 token 限制以容纳可能的少量前导文字
-            )
-            
-            # 兼容处理：优先获取 content，如果为空则尝试 reasoning_content
-            message = completion.choices[0].message
-            score_text = ""
-            if hasattr(message, 'content') and message.content:
-                score_text = message.content.strip()
-            elif hasattr(message, 'reasoning_content') and message.reasoning_content:
-                score_text = message.reasoning_content.strip()
-            
-            # 使用正则表达式提取数字
+            # 尝试提取第一个数字，以防模型返回了额外文字
             import re
-            match = re.search(r'\d+', score_text)
-            if match:
-                score = int(match.group())
+            nums = re.findall(r'\d+', score_text)
+            if nums:
+                score = int(nums[0])
             else:
-                print(f"Warning: Could not find a score in LLM response: '{score_text}'")
                 score = 0
                 
-            if score < 0: score = 0
-            if score > 10: score = 10
+            if score < 0 or score > 10:
+                score = max(0, min(10, score))
             return score
         except Exception as e:
-            print(f"Error during LLM evaluation: {e}")
+            print(f"Error parsing score text '{score_text}': {e}")
             return 0

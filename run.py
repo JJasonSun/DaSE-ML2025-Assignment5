@@ -25,7 +25,7 @@ class CommandArgs:
     base_url: Optional[str] = None  # 可选：覆盖环境变量中的 BASE_URL（命令行优先）
 
     test_mode: Optional[str] = "multi"  # 测试模式：'multi'（多文档，多 needle）或 'single'（单文档，单 needle）
-    evaluator_type: Optional[str] = "string"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
+    evaluator_type: Optional[str] = "llm"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
     haystack_dir: Optional[str] = "PaulGrahamEssays"  # 存放 haystack 文本文件的目录（用于插入 needles）
     results_version: Optional[int] = 1  # 结果保存的版本号，用于区分不同实验批次
 
@@ -43,7 +43,7 @@ class CommandArgs:
     document_depth_percent_intervals: Optional[int] = 10  # 深度划分区间数
 
     # 输出控制：
-    save_results: Optional[bool] = True  # 是否将每次测试结果保存到 results/（json 文件）
+    save_results: Optional[bool] = False  # 是否将每次测试结果保存到 results/（json 文件）
     save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
     print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）
 
@@ -108,12 +108,15 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
 
     # 根据类型初始化评测器
     if args.evaluator_type == 'llm':
+        # 优先从环境变量获取评测专用的 API 配置
+        eval_api_key = os.getenv('EVAL_API_KEY') or api_key
+        eval_base_url = os.getenv('EVAL_BASE_URL') or base_url
+        
         evaluator = LLMEvaluator(
-            api_key=api_key,
-            base_url=base_url,
+            api_key=eval_api_key,
+            base_url=eval_base_url,
             ground_truth=test_case['ground_truth'],
             question=test_case['question'],
-            model_name=agent.model_name
         )
     elif args.evaluator_type == 'string':
         evaluator = StringMatchEvaluator(
@@ -168,8 +171,9 @@ def main():
     """程序入口"""
     args = CLI(CommandArgs, as_positional=False)
 
-    api_key = args.api_key or os.getenv('API_KEY')
-    base_url = args.base_url or os.getenv('BASE_URL')
+    # 优先获取通用的 API_KEY，获取不到时再获取 ECNU_API_KEY 作为兜底
+    api_key = args.api_key or os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
+    base_url = args.base_url or os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL', 'https://api.ecnu.edu.cn/v1')
 
     if not api_key or not base_url:
         raise ValueError("API_KEY and BASE_URL must be provided via arguments or environment variables")

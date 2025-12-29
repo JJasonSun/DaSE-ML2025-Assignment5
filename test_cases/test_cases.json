@@ -1,0 +1,240 @@
+[
+  {
+    "needle": [
+      "The Artemis Foundation recently announced that their classified project 'Stellaris-Omega' will reach its final operational milestone on 2051-1-4, according to internal documents shared with senior staff. This date marks the completion of the project's phase transition protocol.",
+      "Project Stellaris-Omega, designated with the unique identifier AF-PROJ-8876, has been under development since 2045 and focuses on advanced quantum communication systems. All preparatory work must be finalized by this critical date."
+    ],
+    "question": "Based on the Artemis Foundation's internal timeline for project AF-PROJ-8876 (Stellaris-Omega), if the final operational milestone occurs as scheduled and the project team has until February 12, 2051 to submit their closure reports, how many days do they have between the milestone completion and the report deadline?",
+    "ground_truth": "39",
+    "id": 6,
+    "type": "date_time"
+  },
+  {
+    "needle": [
+      "Project Celestial Dawn, identified by code XR7-884, has its final system integration scheduled for 2033-12-13.",
+      "The project's official public unveiling is set for 2034-02-25."
+    ],
+    "question": "Based on the documentation for project XR7-884, how many days are planned between the final system integration and the official public unveiling?",
+    "ground_truth": "74",
+    "id": 7,
+    "type": "date_time"
+  },
+  {
+    "needle": [
+      "In the digital preservation project 'Chronos Archive', the artifact with catalog ID ARC-7F3B-92E4 contains a unique cryptographic signature string: 645335Dae41ecaCded44BEcb28EC3E1d8a9b2Ba1c2Cad6f4FDBdDD1Ff95CeFdA6Eab8dE7FdF9eCEe8BecC6bC0aA715ECb6caCD4A8Bd15E8e9f91D97D0f9D4cFf27. This string represents the authentication hash for the 'Daedalus Manuscript' digitization."
+    ],
+    "question": "For the Chronos Archive project, calculate the first 8 characters of the MD5 hash of the cryptographic signature string associated with artifact ARC-7F3B-92E4 (the Daedalus Manuscript authentication hash).",
+    "ground_truth": "ec8ac3d3",
+    "id": 818,
+    "type": "string_analysis"
+  },
+  {
+    "needle": [
+      "The master configuration file for Project QuantumX contains a unique authentication token with ID QX-AUTH-7B: f1B6FC4dbCFd35aD31Aa79a3D1C49577Cb276B915b781EC6b5CBAFE7Bc2DF619cbEcea78c35dB43EAeDFBEebecC2AEfee2De17ca9B659D48"
+    ],
+    "question": "In the Project QuantumX system, using the authentication token identified by QX-AUTH-7B, calculate the absolute difference between the number of times the character '7' appears and the number of times the character 'b' appears in the token value.",
+    "ground_truth": "2",
+    "id": 819,
+    "type": "string_analysis"
+  },
+  {
+    "needle": [
+      "The artifact designated as ID# 'Cryptographic-Seed-Alpha-7B' contains the following hexadecimal string for entropy analysis: CAcE3Bb2cF0fCb8Ca91F7b4deD86BE39a8dF1FFe6Ad1E8251E6434276Ddc73Cc0aEEcF8cFEA6aA9eAABB18AcBfEBAAF31ae6Ab4a6EB6CeD5E4b7e6CB1cEb5d06daC811aaCecDC9D7Ac1B83A5ec60DADFA9D468CE5C3e775e9ccDCdA6ed0aE1Aad21. This string represents the raw output from the quantum random number generator test conducted on 2024-05-15."
+    ],
+    "question": "Using the string corresponding to ID# 'Cryptographic-Seed-Alpha-7B', calculate the sum of all the individual digits (0-9) that appear within the string.",
+    "ground_truth": "348",
+    "id": 820,
+    "type": "string_analysis"
+  },
+  {
+    "needle": "The integrity checksum for the master encryption key 'MK-ALPHA-7', generated during the Quantum Lock Protocol initialization, is: beD7FDB1af60f4dBfD87096C81107cEE9F93bf5Fb1aDb314a9DDFeB24f9d6d3D2Ec9F6b6FBdDDF2B26EE53eEcd81AdE58d21CF1fD6D43E1aBfB76A3CDfEE67715501E697a80CFDc381B97aFA3CaAC4A6CfD1FE9ff3d9f3daD7AcfAd27FD2e041CEc",
+    "question": "Using the integrity checksum associated with the unique master key identifier 'MK-ALPHA-7', calculate the absolute difference in the total occurrences of the uppercase character 'F' and the lowercase character 'b' within that checksum.",
+    "ground_truth": "7",
+    "id": 821,
+    "type": "string_analysis"
+  },
+  {
+    "needle": [
+      "In the transmission, the agent used a common encoding from RFC 4648, section 4, which pads the output with '='. The code name fragment was processed this way.",
+      "The final confirmation string in the intercepted message log is: UEhPRU5JWDcwMg==, labeled as Package ID 'Zulu-7'."
+    ],
+    "question": "Agent 'Zulu-7' transmitted a critical code name. The encoding method is standard for binary-to-text conversion, and the final encoded string is in our logs. Decode the message to reveal the agent's code name.",
+    "ground_truth": "PHOENIX702",
+    "id": 1269,
+    "type": "encoding"
+  },
+  {
+    "needle": [
+      "The following technical note was recovered from an intercepted communication: 'Standard RFC 4648 section 4 encoding was applied to the asset designation before transmission. Confirm receipt of payload ID: QVRMQVM1MjE='",
+      "Agent briefing document excerpt: 'Operation ATLAS requires verification of all asset designators using the standard internet text encoding protocol. The designator ATLAS521 must be authenticated before proceeding.'"
+    ],
+    "question": "An intelligence intercept contains the encoded asset designator QVRMQVM1MjE=. Using the technical specifications mentioned in the intercepted communication and the operational context from the briefing document, decode the asset designator to authenticate the target.",
+    "ground_truth": "ATLAS521",
+    "id": 1270,
+    "type": "encoding"
+  },
+  {
+    "needle": [
+      "A captured communication from Agent Echo references a critical resource designated by the hex string 414C504841393631. The asset's location is encrypted using a common network protocol data representation.",
+      "The asset's true identifier is obscured; the decryption key is knowing that the string is a direct hexadecimal translation of ASCII characters used in asset tagging."
+    ],
+    "question": "Agent Echo's message contains a hex-encoded asset tag. Using the context from the intelligence brief, what is the true, readable identifier of the critical resource?",
+    "ground_truth": "ALPHA961",
+    "id": 1271,
+    "type": "encoding"
+  },
+  {
+    "needle": [
+      "Agent Falcon's status report uses a simple character-to-hexadecimal mapping. The marker for this transmission is TAG-7B.",
+      "The encoded payload for TAG-7B, as intercepted, is: 4C414D424441313938"
+    ],
+    "question": "Agent Falcon's latest communication, marked TAG-7B, was intercepted and encoded using the standard field character set conversion. What is the decoded plaintext status code?",
+    "ground_truth": "LAMBDA198",
+    "id": 1272,
+    "type": "encoding"
+  },
+  {
+    "needle": [
+      "Agent Orion, your new communications are encrypted using the standard three-position shift protocol we use for all field designations. Confirm receipt of identifier RULRQ835.",
+      "All messages containing the string 835 must be decoded with the primary historical cipher method before transmission to field assets."
+    ],
+    "question": "A field agent intercepts a coded message containing the identifier RULRQ835. The agent's briefing notes mention that for all identifiers ending in 835, the alphabetical characters are encrypted using a specific historical substitution cipher mentioned in the 'standard three-position shift protocol'. What is the decoded identifier?",
+    "ground_truth": "ORION835",
+    "id": 1273,
+    "type": "encoding"
+  },
+  {
+    "needle": [
+      "Galactic Registry Entry 2951258869085401: Total registered ships in the Andromeda sector.",
+      "Federation Database ID 841411825263853: Total operational ships currently deployed in the Andromeda sector.",
+      "Log Entry 311: The duration, in standard cycles, of the Kesselorian conflict.",
+      "Directive 42: The standard fleet deployment multiplier for sector-wide alerts."
+    ],
+    "question": "During the strategic review of the Andromeda sector, a commander needs to calculate the rapid response fleet requirement. The formula requires finding the difference between the total registered ships and the currently deployed ships, multiplying by the duration of the Kesselorian conflict, and then performing an integer division by the standard fleet deployment multiplier. Using only the specific identifiers provided (Galactic Registry Entry, Federation Database ID, Log Entry, and Directive), what is the precise numerical requirement?",
+    "ground_truth": "15622915014964319",
+    "id": 779,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "The encryption key for Project Quantum Shield is 9429988073290637, used for initializing the cipher algorithm",
+      "The core security protocol for Project Quantum Shield requires dividing the key by the block size constant 16 to generate the initial vector"
+    ],
+    "question": "In Project Quantum Shield, to initialize the cipher algorithm, the primary encryption key must be divided by the block size constant to generate the initial vector. What is the resulting integer value for the initial vector?",
+    "ground_truth": "589374254580664",
+    "id": 780,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Clue 1: The quantum flux capacitor, Serial# QFC-ALPHA, registered an energy signature of 6285859514804972 fluxons during the primary resonance scan.",
+      "Clue 2: The tachyon stabilizer, Unit ID TACHYON-BETA, reported a counter-reading of 6627108766168741 fluxons to maintain phase coherence."
+    ],
+    "question": "During the Chronos Anomaly calibration, the 'Temporal Reconciliation' protocol requires calculating the absolute difference in fluxon readings between the quantum flux capacitor (Serial# QFC-ALPHA) and the tachyon stabilizer (Unit ID TACHYON-BETA). What is the precise delta, in fluxons?",
+    "ground_truth": "341249251363769",
+    "id": 781,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+      "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice."
+    ],
+    "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime Significance) and the stars visible at winter solstice (Sunstone Altar prophecy). What is this precise difference?",
+    "ground_truth": "1018330454172374",
+    "id": 782,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Project Genesis Encryption Key Fragment 7A: 9641995585873417",
+      "Quantum Division Factor Gamma: 15"
+    ],
+    "question": "In Project Genesis, when processing the quantum encryption key fragments, what is the integer quotient obtained by dividing Fragment 7A by the Quantum Division Factor Gamma? The result represents the number of quantum states that can be encoded using this specific fragment.",
+    "ground_truth": "642799705724894",
+    "id": 783,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Asset Vault Alpha contains a critical resource count of 4931305872608785 units. Security clearance level: MAXIMUM.",
+      "Operational Database Beta tracks emergency reserves at 4106935655129089 units. Classification: EYES ONLY.",
+      "Strategic multiplier designation GAMMA-394 must be applied to all differential calculations.",
+      "The contingency divisor ZETA-41 is authorized for final resource allocation."
+    ],
+    "question": "As the lead resource coordinator for Project Chimera, you need to calculate the final emergency deployment allocation. Access the classified asset vault numbers (Alpha and Beta), determine the resource differential, apply the strategic multiplier Gamma, then divide by the contingency divisor Zeta using integer division. What is the precise deployment figure?",
+    "ground_truth": "7921996724073176",
+    "id": 784,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Project Aurora Financial Ledger Entry: Reference ID ALPHA-7X9 - Initial allocation amount: 5081026654943862 credits",
+      "Project Aurora Financial Ledger Entry: Reference ID BETA-2Z4 - Revised allocation amount: 5602118042022754 credits"
+    ],
+    "question": "As the financial auditor for Project Aurora, I need to verify the budget adjustment between two key transactions. Calculate the absolute difference in credits between the initial allocation (Reference ID ALPHA-7X9) and the revised allocation (Reference ID BETA-2Z4) to determine the exact funding variance.",
+    "ground_truth": "521091387078892",
+    "id": 785,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Project Phoenix Budget: Total allocation: 9036199510022400 units",
+      "Division Factor: All departments must divide their budgets by: 2"
+    ],
+    "question": "In the Project Phoenix budget reorganization, what is the new departmental budget allocation after applying the mandated division factor to the total allocation?",
+    "ground_truth": "4518099755011200",
+    "id": 786,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Artifact ID: AR-2024-X7, Authentication Code A: 8992325497704129",
+      "The artifact verification system requires computing the master access key from Authentication Code A. No intermediate values or results are stored."
+    ],
+    "question": "In the Chronos Vault security system, each protected artifact has a unique authentication code that must be processed to generate its master access key. For artifact AR-2024-X7, the verification protocol requires calculating the integer square root of Authentication Code A to obtain the 8-digit master key. What is the master access key for artifact AR-2024-X7?",
+    "ground_truth": "94827873",
+    "id": 787,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Project Phoenix Security Vault: Activation Code = 8226564002754165",
+      "Quantum Encryption Protocol: Prime Modulus = 17"
+    ],
+    "question": "In the Project Phoenix security system, to unlock the main vault you need to calculate the decryption key by dividing the Activation Code by the Quantum Encryption Protocol's Prime Modulus. What is the integer quotient that serves as the final decryption key?",
+    "ground_truth": "483915529573774",
+    "id": 788,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Cryptographic Vault ID: 1704428636299076",
+      "Division Key: 17"
+    ],
+    "question": "A high-security cryptographic vault with ID 1704428636299076 requires authentication. To unlock it, you must divide the vault ID by the division key of 17 and provide the integer quotient. What is the authentication code?",
+    "ground_truth": "100260508017592",
+    "id": 789,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "The Quantum Resonance Stabilizer requires exactly 5251623588660560 energy quanta to maintain dimensional coherence.",
+      "Each temporal cycle can process only 5 quanta simultaneously through the harmonic converter."
+    ],
+    "question": "In the Chronos Laboratory's dimensional stability system, the Quantum Resonance Stabilizer needs a specific amount of energy quanta for dimensional coherence. Given that each temporal cycle can process only a limited number of quantas through the harmonic converter, calculate how many complete temporal cycles are required to process all the energy quantas needed by the stabilizer.",
+    "ground_truth": "1050324717732112",
+    "id": 790,
+    "type": "computation"
+  },
+  {
+    "needle": [
+      "Celestial Navigator Alpha's star chart registration code: 9949477924086358",
+      "Celestial Navigator Beta's deep space transponder ID: 9615348644062352"
+    ],
+    "question": "To realign the quantum communication link between two deep space probes, Navigator Alpha and Navigator Beta, the Astro-Engineering Corps must calculate the absolute difference between their unique identification codes. What is the exact quantum alignment parameter, which is the absolute difference between Alpha's star chart registration code and Beta's deep space transponder ID?",
+    "ground_truth": "334129280024006",
+    "id": 791,
+    "type": "computation"
+  }
+]

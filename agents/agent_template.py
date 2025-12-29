@@ -1,6 +1,8 @@
 from typing import List, Dict, Optional
 import tiktoken
 import random
+import os
+from openai import OpenAI
 
 from model import ModelProvider
 
@@ -8,39 +10,19 @@ from model import ModelProvider
 class ExampleAgent(ModelProvider):
     """
     多文档检索 Agent 的示例实现。
-
-    该基线实现仅用于演示接口，策略非常简单：
-    - 随机选择 1 个文本文件
-    - 随机截取 10000 个 token
-    
-    如需更佳效果，可考虑：
-    - 汇总所有相关文件的信息
-    - 使用向量检索的 RAG 流程
-    - 基于相关性的智能文件选择
-    - 与查询相关的上下文抽取
     """
 
     def __init__(self, api_key: str, base_url: str):
-        super().__init__(api_key, base_url)
+        self.api_key = api_key
+        self.base_url = base_url
+        self.model_name = os.getenv('MODEL_NAME', 'glm-4.5')
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.max_tokens_per_request = 10000
 
     async def evaluate_model(self, prompt: Dict) -> str:
         """
         处理多文档检索任务。
-
-        基线策略：
-        1. 在所有文件中随机选取 1 个
-        2. 从该文件随机截取 10000 个 token
-        3. 发送给模型生成答案
-        
-        该方案仅用于演示。
-
-        Args:
-            prompt: 包含 context_data 与 question 的字典
-
-        Returns:
-            模型回答
         """
         context_data = prompt['context_data']
         question = prompt['question']
@@ -59,11 +41,24 @@ class ExampleAgent(ModelProvider):
             }
         ]
 
-        return await self._create_chat_completion(
+        completion = self.client.chat.completions.create(
+            model=self.model_name,
             messages=messages,
             temperature=0,
             max_tokens=300
         )
+        return completion.choices[0].message.content
+
+    def generate_prompt(self, **kwargs) -> Dict:
+        return kwargs
+
+    def encode_text_to_tokens(self, text: str) -> List[int]:
+        return self.tokenizer.encode(text)
+
+    def decode_tokens(self, tokens: List[int], context_length: Optional[int] = None) -> str:
+        if context_length:
+            tokens = tokens[:context_length]
+        return self.tokenizer.decode(tokens)
 
     def _random_select_strategy(self, context_data: Dict) -> str:
         """
