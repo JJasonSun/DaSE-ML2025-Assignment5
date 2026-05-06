@@ -4,7 +4,7 @@ import random
 import os
 from openai import OpenAI
 
-from model import ModelProvider
+from .base_agent import ModelProvider
 
 
 class ExampleAgent(ModelProvider):

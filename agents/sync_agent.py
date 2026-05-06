@@ -6,7 +6,7 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from openai import OpenAI
-from model import ModelProvider
+from .base_agent import ModelProvider
 
 class SyncRetrievalAgent(ModelProvider):
     """

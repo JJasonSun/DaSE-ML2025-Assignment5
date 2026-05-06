@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import List, Dict
 
 from evaluators.evaluator import Evaluator
-from model import ModelProvider
+from agents.base_agent import ModelProvider
 
 
 class LLMMultiNeedleHaystackTester:

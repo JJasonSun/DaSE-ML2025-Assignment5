@@ -5,12 +5,12 @@ from typing import Optional, Tuple, List
 from dotenv import load_dotenv
 from jsonargparse import CLI
 
-from llm_multi_needle_haystack_tester import LLMMultiNeedleHaystackTester
-from llm_single_needle_haystack_tester import LLMSingleNeedleHaystackTester
-from test_case_loader import load_test_cases, get_needles
+from core.llm_multi_needle_haystack_tester import LLMMultiNeedleHaystackTester
+from core.llm_single_needle_haystack_tester import LLMSingleNeedleHaystackTester
+from core.test_case_loader import load_test_cases, get_needles
 from evaluators.llm_evaluator import LLMEvaluator
 from evaluators.string_match_evaluator import StringMatchEvaluator
-from model import ModelProvider
+from agents.base_agent import ModelProvider
 
 load_dotenv()
 
@@ -46,6 +46,69 @@ class CommandArgs:
     save_results: Optional[bool] = False  # 是否将每次测试结果保存到 results/（json 文件）
     save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
     print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）
+    skip_model_test: Optional[bool] = False  # 是否跳过运行前的模型健康检查
+
+def check_models(api_key: str, base_url: str, evaluator_type: str):
+    import requests
+    from openai import OpenAI
+    import os
+
+    print("\n" + "-" * 80)
+    print("[Health Check] Testing models availability before run...")
+    
+    ecnu_api_key = os.getenv('ECNU_API_KEY') or api_key
+    ecnu_base_url = (os.getenv('ECNU_BASE_URL') or base_url).rstrip('/')
+    
+    main_model_name = os.getenv('MODEL_NAME', 'Unknown')
+    
+    # 1. Main model
+    try:
+        main_client = OpenAI(api_key=api_key, base_url=base_url)
+        main_client.chat.completions.create(
+            model=main_model_name,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=5
+        )
+        print(f"  [OK] Main Model ({main_model_name})")
+    except Exception as e:
+        print(f"  [FAIL] Main Model ({main_model_name}): {e}")
+        
+    # 2. Evaluator model
+    if evaluator_type == 'llm':
+        eval_api_key = os.getenv('EVAL_API_KEY') or api_key
+        eval_base_url = os.getenv('EVAL_BASE_URL') or base_url
+        eval_model_name = os.getenv('EVAL_MODEL_NAME', main_model_name)
+        try:
+            eval_client = OpenAI(api_key=eval_api_key, base_url=eval_base_url)
+            eval_client.chat.completions.create(
+                model=eval_model_name,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=5
+            )
+            print(f"  [OK] Evaluator Model ({eval_model_name})")
+        except Exception as e:
+            print(f"  [FAIL] Evaluator Model ({eval_model_name}): {e}")
+
+    # 3. ECNU Embedding
+    try:
+        ecnu_client = OpenAI(api_key=ecnu_api_key, base_url=ecnu_base_url)
+        ecnu_client.embeddings.create(input="hello", model="ecnu-embedding-small")
+        print("  [OK] Embedding Model (ecnu-embedding-small)")
+    except Exception as e:
+        print(f"  [FAIL] Embedding Model (ecnu-embedding-small): {e}")
+
+    # 4. ECNU Rerank
+    try:
+        url = f"{ecnu_base_url}/rerank"
+        headers = {"Authorization": f"Bearer {ecnu_api_key}", "Content-Type": "application/json"}
+        payload = {"model": "ecnu-rerank", "query": "hi", "documents": ["hello"], "top_n": 1}
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        print("  [OK] Rerank Model (ecnu-rerank)")
+    except Exception as e:
+        print(f"  [FAIL] Rerank Model (ecnu-rerank): {e}")
+        
+    print("-" * 80 + "\n")
 
 
 def parse_agent_spec(agent_spec: str) -> Tuple[str, str]:
@@ -183,6 +246,9 @@ def main():
 
     if args.evaluator_type not in ['string', 'llm']:
         raise ValueError(f"evaluator_type must be 'string' or 'llm', got: {args.evaluator_type}")
+
+    if not args.skip_model_test:
+        check_models(api_key, base_url, args.evaluator_type)
 
     # 加载所有测试用例
     test_cases = load_test_cases(args.test_case_json)

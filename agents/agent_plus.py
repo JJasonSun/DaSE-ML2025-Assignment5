@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from rank_bm25 import BM25Okapi
 
-from model import ModelProvider
+from .base_agent import ModelProvider
 
 
 class AdvancedRetrievalAgent(ModelProvider):

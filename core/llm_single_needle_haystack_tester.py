@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from evaluators.evaluator import Evaluator
-from model import ModelProvider
+from agents.base_agent import ModelProvider
 
 from asyncio import Semaphore
 from datetime import datetime, timezone
