@@ -144,11 +144,11 @@ class SyncRetrievalAgent(ModelProvider):
             messages = [
                 {
                     "role": "system",
-                    "content": "你是一位严谨且高效的问答助手。以下规则必须同时满足：\n1. 准确提取上下文信息。如果问题涉及日期计算或星期推算，请基于上下文中的日期进行推导。\n2. 不要输出多余文字，只提供最终答案。\n3. 处理日期/星期时，请返回英文格式（例：Thursday, December 25, 2031）。\n4. 数字类问题请直接给出阿拉伯数字。\n5. 如果无法判断答案，返回“无法生成有效回答”。\n6. 最终答案必须使用英文表达。"
+                    "content": "你是一位严格的答案输出器。请只返回最终答案本身，不要解释过程，不要复述题目，不要加前缀、后缀、编号、项目符号、引号、代码块或任何额外标点。\n1. 如果问题涉及日期计算或星期推算，请基于上下文中的日期进行推导。\n2. 日期/星期请使用英文格式输出（例如：Thursday, December 25, 2031）。\n3. 数字类问题请直接输出阿拉伯数字。\n4. 如果答案是单词、短语或数字，只输出答案内容本身。\n5. 如果无法判断答案，只输出：无法生成有效回答。\n6. 最终答案必须使用英文表达。"
                 },
                 {
                     "role": "user",
-                    "content": f"根据以下上下文直接回答问题，不需要说明过程。\n\n上下文内容：\n{selected_content}\n\n问题：{question}\n\n请直接写出答案："
+                    "content": f"请仅根据以下上下文回答问题，只输出答案本身，不要解释。\n\n上下文内容：\n{selected_content}\n\n问题：{question}\n\n答案："
                 }
             ]
 
@@ -169,11 +169,11 @@ class SyncRetrievalAgent(ModelProvider):
                 backup_messages = [
                     {
                         "role": "system",
-                        "content": "你是一位只输出最终结果的中文助手。遇到无法确定时说“无法生成有效回答”。最终答案必须使用英文。"
+                        "content": "你是一位只输出最终答案的助手。不要解释，不要补充，不要加任何多余文字。遇到无法确定时，只输出：无法生成有效回答。最终答案必须使用英文。"
                     },
                     {
                         "role": "user",
-                        "content": f"请参考下面的信息，直接给出答案，不需要过程。\n\n{selected_content}\n\n问题：{question}\n\n答案："
+                        "content": f"请只根据下面的信息输出最终答案本身，不要过程，不要解释。\n\n{selected_content}\n\n问题：{question}\n\n答案："
                     }
                 ]
                 response = await self._create_chat_completion(
@@ -186,7 +186,7 @@ class SyncRetrievalAgent(ModelProvider):
             
             # 最终检查和清理响应
             if response and response.strip():
-                return self._extract_answer(response)
+                return self.compress_final_answer(self._extract_answer(response))
             else:
                 return "无法生成有效回答"
                 

@@ -1,4 +1,13 @@
-# ecnu-rerank说明文档
+## 重排模型ecnu-rerank
+
+* **模型简介** ：通用文本重排序
+* **上下文** ：8K
+* **部署方案** ：本地部署
+* **默认限流** ：
+* 每分钟请求数（rpm）：600
+* 每天请求数（rpd）：无上限
+
+# 通用文本向量
 
 提供 `Cohere` 兼容的通用文本向量接口。
 
@@ -8,12 +17,12 @@ POST
 
 ## 请求地址
 
-https://chat.ecnu.edu.cn/open/api/v1/rerank
+[https://chat.ecnu.edu.cn/open/api/v1/rerank](https://chat.ecnu.edu.cn/open/api/v1/rerank)
 
 ## 请求参数
 
 | 参数名           | 类型   | 是否必须 | 描述                                                                                                     |
-| :--------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------- |
+| ---------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------- |
 | model            | string | 是       | 模型名称，目前可用 `ecnu-rerank`，详见 [模型列表](https://developer.ecnu.edu.cn/vitepress/llm/model.html) |
 | documents        | array  | 是       | 文档列表，每个文档不超过 8192 个字符                                                                     |
 | query            | string | 是       | 查询文本                                                                                                 |
@@ -23,7 +32,7 @@ https://chat.ecnu.edu.cn/open/api/v1/rerank
 ## 返回参数
 
 | 参数名          | 类型   | 描述       |
-| :-------------- | :----- | :--------- |
+| --------------- | ------ | ---------- |
 | results         | array  | 结果列表   |
 | index           | int    | 文档索引   |
 | document        | string | 文档内容   |
@@ -32,7 +41,7 @@ https://chat.ecnu.edu.cn/open/api/v1/rerank
 
 ## 请求示例
 
-```http
+```
 POST https://chat.ecnu.edu.cn/open/api/v1/rerank
 Authorization: Bearer sk-******5c935b119e
 Content-Type: application/json
@@ -52,7 +61,7 @@ Content-Type: application/json
 
 ## 返回示例
 
-```json
+```
 {
   "results": [
     {

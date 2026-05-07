@@ -47,7 +47,7 @@ class ExampleAgent(ModelProvider):
             temperature=0,
             max_tokens=300
         )
-        return completion.choices[0].message.content
+        return self.compress_final_answer(completion.choices[0].message.content)
 
     def generate_prompt(self, **kwargs) -> Dict:
         return kwargs

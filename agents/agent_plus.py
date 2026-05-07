@@ -234,7 +234,7 @@ class AdvancedRetrievalAgent(ModelProvider):
             )
             answer = response_raw.strip()
 
-        return answer
+        return self.compress_final_answer(answer)
 
     def generate_prompt(self, **kwargs) -> Dict:
         return {"context_data": kwargs.get("context_data"), "question": kwargs.get("question")}
