@@ -253,7 +253,7 @@ class LLMMultiNeedleHaystackTester:
                 os.makedirs('results')
 
             result_file = f'results/{self.model_to_test.model_name}_test_{test_number}_results.json'
-            with open(result_file, 'w') as f:
+            with open(result_file, 'w', encoding='utf-8') as f:
                 json.dump(results, f, indent=2)
 
         # 保存上下文
@@ -263,7 +263,7 @@ class LLMMultiNeedleHaystackTester:
 
             for modified_file in context_data['files']:
                 context_file = f"contexts/test_{test_number}_{modified_file['filename']}"
-                with open(context_file, 'w') as f:
+                with open(context_file, 'w', encoding='utf-8') as f:
                     f.write(modified_file['modified_content'])
 
     async def run_test(self):

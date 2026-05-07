@@ -4,6 +4,7 @@ import random
 import os
 from openai import OpenAI
 
+from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_MAIN_MODEL_NAME
 from .base_agent import ModelProvider
 
 
@@ -13,10 +14,10 @@ class ExampleAgent(ModelProvider):
     """
 
     def __init__(self, api_key: str, base_url: str):
-        self.api_key = api_key
-        self.base_url = base_url
-        self.model_name = os.getenv('MODEL_NAME', 'glm-4.5')
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.api_key = api_key or os.getenv('ECNU_API_KEY') or ""
+        self.base_url = (base_url or os.getenv('ECNU_BASE_URL') or DEFAULT_ECNU_BASE_URL).rstrip('/')
+        self.model_name = os.getenv('MODEL_NAME', ECNU_MAIN_MODEL_NAME)
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.max_tokens_per_request = 10000
 

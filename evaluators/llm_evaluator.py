@@ -1,7 +1,7 @@
-﻿import os
-from openai import OpenAI
+﻿from openai import OpenAI
 from typing import Dict
 from .evaluator import Evaluator
+from core.ecnu_constants import ECNU_PLUS_MODEL_NAME
 
 
 class LLMEvaluator(Evaluator):
@@ -21,30 +21,16 @@ Score 10: The answer is completely accurate and matches the ground truth.
         """Initialize the LLM evaluator."""
         self.ground_truth = ground_truth
         self.question = question
-        
-        # 1. 评测专用配置 (Primary)
-        self.eval_api_key = os.getenv('EVAL_API_KEY')
-        self.eval_base_url = os.getenv('EVAL_BASE_URL')
-        self.eval_model_name = os.getenv('EVAL_MODEL_NAME')
-        
-        # 2. Agent 配置 (Fallback)
-        self.agent_api_key = api_key
-        self.agent_base_url = base_url
-        self.agent_model_name = os.getenv('MODEL_NAME') or "ecnu-max"
+        self.eval_api_key = api_key
+        self.eval_base_url = base_url
+        self.eval_model_name = ECNU_PLUS_MODEL_NAME
 
     def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
         """封装 API 调用逻辑。"""
         if not model:
             return None
 
-        extra_body = {}
-        # 评测时统一禁用思考模式，以获得快速且直接的分数输出
-        if not model.lower().startswith("ecnu"):
-            extra_body = {
-                "thinking": {
-                    "type": "disabled"
-                }
-            }
+        extra_body = {"thinking": {"type": "disabled"}}
 
         completion = client.chat.completions.create(
             model=model,
@@ -75,23 +61,9 @@ Scoring Criteria:
 Please evaluate the answer and respond with ONLY a single number from 0 to 10. Do not include any explanation or other text."""
 
         score_text = None
-        
-        # 1. 尝试评测专用模型
-        if self.eval_api_key and self.eval_base_url and self.eval_model_name:
-            try:
-                eval_client = OpenAI(api_key=self.eval_api_key, base_url=self.eval_base_url)
-                score_text = self._call_api(eval_client, self.eval_model_name, evaluation_prompt)
-            except Exception as e:
-                print(f"Evaluation model ({self.eval_model_name}) failed: {e}")
 
-        # 2. 兜底策略：使用 Agent 的 API
-        if score_text is None:
-            print(f"Switching to Agent API for evaluation fallback")
-            try:
-                agent_client = OpenAI(api_key=self.agent_api_key, base_url=self.agent_base_url)
-                score_text = self._call_api(agent_client, self.agent_model_name, evaluation_prompt)
-            except Exception as e:
-                print(f"Agent API evaluation failed: {e}")
+        eval_client = OpenAI(api_key=self.eval_api_key, base_url=self.eval_base_url)
+        score_text = self._call_api(eval_client, self.eval_model_name, evaluation_prompt)
 
         if score_text is None:
             return 0

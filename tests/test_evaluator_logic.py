@@ -5,18 +5,19 @@ from dotenv import load_dotenv
 # 将项目根目录添加到路径，以便导入 evaluators
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_PLUS_MODEL_NAME
 from evaluators.llm_evaluator import LLMEvaluator
 
 def test_evaluator():
     load_dotenv()
     
     # 获取评测配置
-    api_key = os.getenv('EVAL_API_KEY') or os.getenv('API_KEY')
-    base_url = os.getenv('EVAL_BASE_URL') or os.getenv('BASE_URL')
-    model_name = os.getenv('EVAL_MODEL_NAME') or os.getenv('MODEL_NAME')
+    api_key = os.getenv('ECNU_API_KEY')
+    base_url = os.getenv('ECNU_BASE_URL') or DEFAULT_ECNU_BASE_URL
+    model_name = ECNU_PLUS_MODEL_NAME
     
     if not api_key or not base_url:
-        print("Error: API_KEY or BASE_URL not found in .env")
+        print("Error: ECNU_API_KEY not found in .env")
         return
 
     print(f"Testing Evaluator with model: {model_name}")

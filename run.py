@@ -1,7 +1,9 @@
 import os
+
 from dotenv import load_dotenv
 from jsonargparse import CLI
 
+from core.ecnu_constants import DEFAULT_ECNU_BASE_URL
 from core.config import CommandArgs
 from core.health_check import check_models
 from core.runner import run_single_test_case
@@ -13,12 +15,12 @@ def main():
     """程序入口"""
     args = CLI(CommandArgs, as_positional=False)
 
-    # 优先获取通用的 API_KEY，获取不到时再获取 ECNU_API_KEY 作为兜底
-    api_key = args.api_key or os.getenv('API_KEY') or os.getenv('ECNU_API_KEY')
-    base_url = args.base_url or os.getenv('BASE_URL') or os.getenv('ECNU_BASE_URL', 'https://api.ecnu.edu.cn/v1')
+    # 仅使用 ECNU 配置作为运行时来源
+    api_key = args.api_key or os.getenv('ECNU_API_KEY')
+    base_url = args.base_url or os.getenv('ECNU_BASE_URL', DEFAULT_ECNU_BASE_URL)
 
     if not api_key or not base_url:
-        raise ValueError("API_KEY and BASE_URL must be provided via arguments or environment variables")
+        raise ValueError("ECNU_API_KEY and ECNU_BASE_URL must be provided via arguments or environment variables")
 
     if args.test_mode not in ['single', 'multi']:
         raise ValueError(f"test_mode must be 'single' or 'multi', got: {args.test_mode}")

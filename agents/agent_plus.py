@@ -3,7 +3,7 @@ import json
 import math
 import os
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, cast
 
 import requests
 import tiktoken
@@ -11,6 +11,13 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from rank_bm25 import BM25Okapi
 
+from core.ecnu_constants import (
+    DEFAULT_ECNU_BASE_URL,
+    ECNU_EMBEDDING_MODEL_NAME,
+    ECNU_MAIN_MODEL_NAME,
+    ECNU_PLUS_MODEL_NAME,
+    ECNU_RERANK_MODEL_NAME,
+)
 from .base_agent import ModelProvider
 
 
@@ -26,21 +33,17 @@ class AdvancedRetrievalAgent(ModelProvider):
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         load_dotenv()
 
-        api_key = api_key or os.getenv("API_KEY") or os.getenv("ECNU_API_KEY") or ""
-        base_url = base_url or os.getenv("BASE_URL") or os.getenv("ECNU_BASE_URL") or ""
+        api_key = api_key or os.getenv("ECNU_API_KEY") or ""
+        base_url = base_url or os.getenv("ECNU_BASE_URL") or DEFAULT_ECNU_BASE_URL
         super().__init__(api_key=api_key, base_url=base_url)
 
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
-        self.model_name = os.getenv("MODEL_NAME") or "ecnu-max"
+        self.model_name = os.getenv("MODEL_NAME") or ECNU_MAIN_MODEL_NAME
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
-        self.ecnu_api_key = os.getenv("ECNU_API_KEY") or self.api_key
-        self.ecnu_base_url = (os.getenv("ECNU_BASE_URL") or self.base_url).rstrip("/")
-        self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
-
-        self.embedding_model = "ecnu-embedding-small"
-        self.rerank_model = "ecnu-rerank"
+        self.embedding_model = ECNU_EMBEDDING_MODEL_NAME
+        self.rerank_model = ECNU_RERANK_MODEL_NAME
 
         self.chunk_size_tokens = 500
         self.chunk_overlap_tokens = 100
@@ -99,19 +102,16 @@ class AdvancedRetrievalAgent(ModelProvider):
             params["response_format"] = response_format
 
         extra_body: Dict = {}
-        # 仅对非 ecnu 模型（即主回答模型）应用思考模式配置
-        if not model_to_use.startswith("ecnu-"):
-            if enable_thinking:
-                print(f"本次任务对模型 {model_to_use} 开启深度思考")
-                extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
-            else:
-                extra_body["thinking"] = {"type": "disabled"}
+        if enable_thinking:
+            print(f"本次任务对模型 {model_to_use} 开启深度思考")
+            extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
+        else:
+            extra_body["thinking"] = {"type": "disabled"}
         
         if extra_body:
             params["extra_body"] = extra_body
 
-        # 根据模型名称自动选择 Client
-        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
+        client_to_use = self.client
 
         def _sync_call():
             return client_to_use.chat.completions.create(**params)
@@ -161,7 +161,8 @@ class AdvancedRetrievalAgent(ModelProvider):
         full_context = self._build_full_context(context_data)
         
         # 1. 初次尝试：使用原始问题进行检索
-        if full_context["total_tokens"] <= self.full_context_threshold_tokens:
+        total_context_tokens = int(full_context["total_tokens"])
+        if total_context_tokens <= self.full_context_threshold_tokens:
             context_for_llm = full_context["text"]
         else:
             evidence = self._retrieve_with_hybrid(question, context_data)
@@ -186,53 +187,6 @@ class AdvancedRetrievalAgent(ModelProvider):
             thinking_budget_tokens=8000,
         )
         answer = response_raw.strip()
-
-        # 2. 兜底策略
-        # 判断是否为 Unknown (宽松判断)
-        is_unknown = answer.lower() == "unknown" or (len(answer) < 20 and "unknown" in answer.lower()) or "empty response" in answer.lower()
-
-        if not answer or is_unknown:
-            print(f"[Debug] Initial attempt failed for: {question}. Trying ecnu-reasoner fallback...")
-            
-            # 自适应策略：如果是因为检索不到，尝试扩大检索范围
-            if full_context["total_tokens"] > self.full_context_threshold_tokens:
-                print(f"[Debug] Expanding retrieval scope for fallback...")
-                expanded_queries = await self._expand_query(question)
-                
-                # 临时增加召回数量
-                orig_top_n = self.rerank_top_n
-                self.rerank_top_n = 15 
-                evidence = self._retrieve_with_hybrid(question, context_data, queries=expanded_queries)
-                context_for_llm = evidence["evidence_text"]
-                self.rerank_top_n = orig_top_n
-
-            # 构建兜底专用的 System Prompt
-            fallback_system_prompt = (
-                "你是一名严谨的长文检索与推理专家。之前的尝试未能找到确切答案。\n"
-                "请仔细重新分析上下文，列出所有你认为可能相关的片段和线索。\n"
-                "展示你的推理过程，说明为什么这些线索不足以得出确切答案，或者尝试进行合理的推断。\n"
-                "【重要】即使无法确定，也不要只输出 'Unknown'，必须提供详细的分析过程和相关数据。"
-            )
-
-            # 更新消息中的上下文
-            messages = [
-                {"role": "system", "content": fallback_system_prompt},
-                {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
-            ]
-
-            # 切换到更强大的推理模型
-            response_raw = await self._create_chat_completion(
-                messages=messages,
-                model="ecnu-reasoner",
-                temperature=1,
-                top_p=0.95,
-                max_tokens=16000,
-                timeout=240,
-                # response_format={"type": "json_object"}, # REMOVED
-                enable_thinking=True,
-                thinking_budget_tokens=8000,
-            )
-            answer = response_raw.strip()
 
         return self.compress_final_answer(answer)
 
@@ -272,25 +226,26 @@ class AdvancedRetrievalAgent(ModelProvider):
             "查询列表:"
         )
         messages = [{"role": "user", "content": prompt}]
-        try:
-            # 硬编码使用 ecnu-max 进行查询扩展，以提高召回率
-            response = await self._create_chat_completion(
-                messages=messages,
-                model="ecnu-max",
-                temperature=0.3,
-                max_tokens=150,
-                enable_thinking=False
-            )
-            match = re.search(r"\[.*\]", response, re.DOTALL)
-            if match:
-                queries = json.loads(match.group(0))
-                if isinstance(queries, list) and len(queries) > 0:
-                    if question not in queries:
-                        queries.append(question)
-                    return queries[:4]
-        except Exception as e:
-            print(f"[Debug] Query expansion failed: {e}")
-        return [question]
+
+        # 使用 ECNU-plus 进行查询扩展（若未来启用该辅助路径）
+        response = await self._create_chat_completion(
+            messages=messages,
+            model=ECNU_PLUS_MODEL_NAME,
+            temperature=0.3,
+            max_tokens=150,
+            enable_thinking=False
+        )
+        match = re.search(r"\[.*\]", response, re.DOTALL)
+        if not match:
+            raise ValueError(f"Failed to parse query expansion response: {response[:120]}")
+
+        queries = json.loads(match.group(0))
+        if isinstance(queries, list) and len(queries) > 0:
+            if question not in queries:
+                queries.append(question)
+            return queries[:4]
+
+        raise ValueError("ECNU-plus returned an empty query expansion list")
 
     def _retrieve_with_hybrid(self, question: str, context_data: Dict, queries: Optional[List[str]] = None) -> Dict[str, str]:
         """
@@ -322,7 +277,7 @@ class AdvancedRetrievalAgent(ModelProvider):
             bm25_indices.update([idx for idx, score in bm25_top if score > 0])
 
             # Vector
-            query_emb = self._get_embeddings(q)
+            query_emb = cast(List[float], self._get_embeddings(q))
             if query_emb:
                 if len(chunks) <= 300:
                     candidate_for_vector = list(range(len(chunks)))
@@ -332,12 +287,12 @@ class AdvancedRetrievalAgent(ModelProvider):
                     candidate_for_vector = [idx for idx, _ in bm25_pool]
 
                 texts = [chunks[i]["text"] for i in candidate_for_vector]
-                doc_embs = self._get_embeddings_in_batches(texts, batch_size=64)
+                doc_embs = cast(List[List[float]], self._get_embeddings_in_batches(texts, batch_size=64))
                 
                 q_vector_scores = []
                 for idx, emb in zip(candidate_for_vector, doc_embs):
                     if emb:
-                        sim = self._cosine_similarity(query_emb, emb)
+                        sim = self._cosine_similarity(query_emb, cast(List[float], emb))
                         q_vector_scores.append((idx, sim))
                 q_vector_top = sorted(q_vector_scores, key=lambda x: x[1], reverse=True)[: self.top_k_vector]
                 vector_indices.update([idx for idx, sim in q_vector_top])
@@ -611,9 +566,9 @@ class AdvancedRetrievalAgent(ModelProvider):
     def _get_embeddings(self, input_data: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
         try:
             if isinstance(input_data, str):
-                response = self.ecnu_client.embeddings.create(model=self.embedding_model, input=input_data)
+                response = self.client.embeddings.create(model=self.embedding_model, input=input_data)
                 return response.data[0].embedding
-            resp = self.ecnu_client.embeddings.create(model=self.embedding_model, input=input_data)
+            resp = self.client.embeddings.create(model=self.embedding_model, input=input_data)
             sorted_data = sorted(resp.data, key=lambda x: x.index)
             return [item.embedding for item in sorted_data]
         except Exception as e:
@@ -627,14 +582,15 @@ class AdvancedRetrievalAgent(ModelProvider):
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             batch_embs = self._get_embeddings(batch)
-            results.extend(batch_embs if isinstance(batch_embs, list) else [])
+            if isinstance(batch_embs, list):
+                results.extend(cast(List[List[float]], batch_embs))
         return results
 
     def _rerank_documents(self, query: str, documents: List[str], top_n: int = 8) -> List[Dict]:
         if not documents:
             return []
-        url = f"{self.ecnu_base_url}/rerank"
-        headers = {"Authorization": f"Bearer {self.ecnu_api_key}", "Content-Type": "application/json"}
+        url = f"{self.base_url}/rerank"
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         payload = {"model": self.rerank_model, "query": query, "documents": documents, "top_n": top_n, "return_documents": True}
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=30)

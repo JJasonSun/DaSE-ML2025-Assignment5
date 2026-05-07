@@ -178,14 +178,14 @@ class LLMSingleNeedleHaystackTester:
             if not os.path.exists('contexts'):
                 os.makedirs('contexts')
 
-            with open(f'contexts/{context_file_location}_context.txt', 'w') as f:
+            with open(f'contexts/{context_file_location}_context.txt', 'w', encoding='utf-8') as f:
                 f.write(context)
 
         if self.save_results:
             if not os.path.exists('results'):
                 os.makedirs('results')
 
-            with open(f'results/{context_file_location}_results.json', 'w') as f:
+            with open(f'results/{context_file_location}_results.json', 'w', encoding='utf-8') as f:
                 json.dump(results, f)
 
         if self.seconds_to_sleep_between_completions:
@@ -199,7 +199,7 @@ class LLMSingleNeedleHaystackTester:
 
         for filename in os.listdir(results_dir):
             if filename.endswith('.json'):
-                with open(os.path.join(results_dir, filename), 'r') as f:
+                with open(os.path.join(results_dir, filename), 'r', encoding='utf-8') as f:
                     result = json.load(f)
                     context_length_met = result['context_length'] == context_length
                     depth_percent_met = result['depth_percent'] == depth_percent
@@ -255,7 +255,7 @@ class LLMSingleNeedleHaystackTester:
 
         while self.get_context_length_in_tokens(context) < max_context_length:
             for file in glob.glob(os.path.join(txt_dir, "*.txt")):
-                with open(file, 'r') as f:
+                with open(file, 'r', encoding='utf-8', errors='replace') as f:
                     context += f.read()
         return context
 

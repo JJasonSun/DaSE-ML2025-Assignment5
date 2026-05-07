@@ -1,9 +1,8 @@
-import asyncio
 import json
-import os
 import re
 from typing import Dict, List, Optional
 
+from core.ecnu_constants import ECNU_PLUS_MODEL_NAME
 from agents.agent_plus import AdvancedRetrievalAgent
 
 class ScenarioAwareAgent(AdvancedRetrievalAgent):
@@ -84,10 +83,10 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
         
         messages = [{"role": "user", "content": classification_prompt}]
         
-        # 使用 ecnu-max 进行分类
+        # 使用 ECNU-plus 进行分类
         response = await self._create_chat_completion(
             messages=messages,
-            model="ecnu-max",
+            model=ECNU_PLUS_MODEL_NAME,
             temperature=0,
             max_tokens=100,
             enable_thinking=False,

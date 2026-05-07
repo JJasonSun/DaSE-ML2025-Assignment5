@@ -6,6 +6,7 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from openai import OpenAI
+from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_MAIN_MODEL_NAME
 from .base_agent import ModelProvider
 
 class SyncRetrievalAgent(ModelProvider):
@@ -24,14 +25,10 @@ class SyncRetrievalAgent(ModelProvider):
     def __init__(self, api_key: str, base_url: str):
         super().__init__(api_key, base_url)
         load_dotenv()
-        self.api_key = api_key
-        self.base_url = base_url.rstrip('/')
-        self.model_name = os.getenv('MODEL_NAME') or "ecnu-max"
+        self.api_key = api_key or os.getenv("ECNU_API_KEY") or ""
+        self.base_url = (base_url or os.getenv("ECNU_BASE_URL") or DEFAULT_ECNU_BASE_URL).rstrip("/")
+        self.model_name = os.getenv('MODEL_NAME') or ECNU_MAIN_MODEL_NAME
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-
-        self.ecnu_api_key = os.getenv("ECNU_API_KEY") or self.api_key
-        self.ecnu_base_url = (os.getenv("ECNU_BASE_URL") or self.base_url).rstrip("/")
-        self.ecnu_client = OpenAI(api_key=self.ecnu_api_key, base_url=self.ecnu_base_url)
 
         self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.max_tokens_per_request = 512
@@ -62,19 +59,16 @@ class SyncRetrievalAgent(ModelProvider):
             params["response_format"] = response_format
 
         extra_body: Dict = {}
-        # 仅对非 ecnu 模型（即主回答模型）应用思考模式配置
-        if not model_to_use.startswith("ecnu-"):
-            if enable_thinking:
-                print(f"本次任务对模型 {model_to_use} 开启深度思考")
-                extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
-            else:
-                extra_body["thinking"] = {"type": "disabled"}
+        if enable_thinking:
+            print(f"本次任务对模型 {model_to_use} 开启深度思考")
+            extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
+        else:
+            extra_body["thinking"] = {"type": "disabled"}
         
         if extra_body:
             params["extra_body"] = extra_body
 
-        # 根据模型名称自动选择 Client
-        client_to_use = self.ecnu_client if model_to_use.startswith("ecnu-") else self.client
+        client_to_use = self.client
 
         def _sync_call():
             return client_to_use.chat.completions.create(**params)
@@ -125,17 +119,24 @@ class SyncRetrievalAgent(ModelProvider):
 
     async def evaluate_model(self, prompt: Dict) -> str:
         """
-        通过同步 HTTP 请求完成多文档检索。
+        通过同步 HTTP 请求完成检索。
         """
         try:
-            context_data = prompt.get('context_data', {})
+            context_data = prompt.get('context_data')
+            context = prompt.get('context')
             question = prompt.get('question', '')
             
-            if not context_data or not question:
+            if not question:
                 return "缺少必要的输入数据"
 
-            # 提取相关内容
-            selected_content = self._retrieve_content(context_data, question)
+            if context_data:
+                # multi 模式：从结构化上下文中提取相关内容
+                selected_content = self._retrieve_content(context_data, question)
+            elif isinstance(context, str) and context.strip():
+                # single 模式：直接使用纯上下文字符串
+                selected_content = self._truncate_text(context, self.max_tokens_per_request)
+            else:
+                return "缺少必要的输入数据"
             
             if not selected_content or selected_content == "No relevant content found.":
                 return "未找到相关内容"
@@ -162,27 +163,6 @@ class SyncRetrievalAgent(ModelProvider):
                 enable_thinking=True,
                 thinking_budget_tokens=4000
             )
-            
-            # 如果响应为空或包含错误信息，尝试备用策略
-            if not response or response.strip() == "" or "error" in response.lower() or "empty" in response.lower():
-                # 尝试更简单的prompt
-                backup_messages = [
-                    {
-                        "role": "system",
-                        "content": "你是一位只输出最终答案的助手。不要解释，不要补充，不要加任何多余文字。遇到无法确定时，只输出：无法生成有效回答。最终答案必须使用英文。"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"请只根据下面的信息输出最终答案本身，不要过程，不要解释。\n\n{selected_content}\n\n问题：{question}\n\n答案："
-                    }
-                ]
-                response = await self._create_chat_completion(
-                    messages=backup_messages,
-                    temperature=0.1,
-                    max_tokens=500,
-                    timeout=30,
-                    enable_thinking=False
-                )
             
             # 最终检查和清理响应
             if response and response.strip():
@@ -422,6 +402,7 @@ class SyncRetrievalAgent(ModelProvider):
     def generate_prompt(self, **kwargs) -> Dict:
         """生成 prompt 结构。"""
         return {
+            'context': kwargs.get('context'),
             'context_data': kwargs.get('context_data'),
             'question': kwargs.get('question')
         }

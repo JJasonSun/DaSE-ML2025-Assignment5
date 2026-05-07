@@ -1,17 +1,28 @@
 '''
 一个简单的测试脚本，用于测试API是否可用，以及打印可用模型列表。
-请确保在运行此脚本前，已经正确设置了`.env`文件中的`API_KEY`、`BASE_URL`和`MODEL_NAME`变量。
+请确保在运行此脚本前，已经正确设置了`.env`文件中的`ECNU_API_KEY`、`ECNU_BASE_URL`和`MODEL_NAME`变量。
 '''
 
 from openai import OpenAI
 import os
+import sys
 from dotenv import load_dotenv
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_MAIN_MODEL_NAME
 
 load_dotenv()
 
+api_key = os.getenv('ECNU_API_KEY')
+base_url = os.getenv('ECNU_BASE_URL', DEFAULT_ECNU_BASE_URL)
+
+if not api_key:
+    raise ValueError("ECNU_API_KEY is not set in the environment. Please add it to .env before running.")
+
 client = OpenAI(
-    api_key= os.getenv('API_KEY'),
-    base_url= os.getenv('BASE_URL')
+    api_key=api_key,
+    base_url=base_url
 )
 
 
@@ -29,18 +40,7 @@ print_available_models()
 
 model_name = os.getenv('MODEL_NAME')
 if not model_name:
-    raise ValueError("MODEL_NAME is not set in the environment. Please add it to .env or set it before running.")
-
-
-extra_body = {}
-
-# 所有的 ecnu 模型都不支持 thinking 参数
-if not model_name.lower().startswith("ecnu"):
-    extra_body = {
-        "thinking": {
-            "type": "enabled" # 可选值: "auto", "enabled", "disabled"
-        }
-    }
+    model_name = ECNU_MAIN_MODEL_NAME
 
 completion = client.chat.completions.create(
     model=model_name,
@@ -50,7 +50,6 @@ completion = client.chat.completions.create(
     ],
     top_p=0.95,
     temperature=1,
-    extra_body=extra_body,
     max_tokens=16000
 )
 
@@ -58,9 +57,10 @@ completion = client.chat.completions.create(
 message = completion.choices[0].message
 
 # 如果存在推理内容，则打印推理过程
-if hasattr(message, 'reasoning_content') and message.reasoning_content:
+reasoning_content = getattr(message, 'reasoning_content', None)
+if reasoning_content:
     print("--- Reasoning Process ---")
-    print(message.reasoning_content)
+    print(reasoning_content)
     print("-------------------------")
 
 print(completion.model_dump_json()) # 打印完整的响应JSON以供调试

@@ -1,18 +1,26 @@
 import os
-import json
 import requests
 import numpy as np
+import sys
 from openai import OpenAI
 from dotenv import load_dotenv
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.ecnu_constants import (
+    DEFAULT_ECNU_BASE_URL,
+    ECNU_EMBEDDING_MODEL_NAME,
+    ECNU_RERANK_MODEL_NAME,
+)
 
 def test_ecnu_models_niah():
     load_dotenv()
     
-    api_key = os.getenv('ECNU_API_KEY') or os.getenv('API_KEY')
-    base_url = (os.getenv('ECNU_BASE_URL') or os.getenv('BASE_URL') or "https://api.ecnu.edu.cn/v1").rstrip('/')
+    api_key = os.getenv('ECNU_API_KEY')
+    base_url = (os.getenv('ECNU_BASE_URL') or DEFAULT_ECNU_BASE_URL).rstrip('/')
     
     if not api_key:
-        print("❌ Error: ECNU_API_KEY or API_KEY not found in .env")
+        print("❌ Error: ECNU_API_KEY not found in .env")
         return
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -21,7 +29,7 @@ def test_ecnu_models_niah():
     print("-" * 60)
 
     # 1. Prepare Haystack
-    essay_dir = "PaulGrahamEssays"
+    essay_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PaulGrahamEssays")
     essays = ["addiction.txt", "apple.txt", "bias.txt", "boss.txt", "copy.txt"]
     haystack = []
     
@@ -44,11 +52,11 @@ def test_ecnu_models_niah():
     print("-" * 60)
 
     # 3. Step 1: Embedding Retrieval (Simulated)
-    print("\n[Step 1] Embedding Retrieval (ecnu-embedding-small)...")
+    print(f"\n[Step 1] Embedding Retrieval ({ECNU_EMBEDDING_MODEL_NAME})...")
     try:
         # Get query embedding
         query_emb = client.embeddings.create(
-            model="ecnu-embedding-small",
+            model=ECNU_EMBEDDING_MODEL_NAME,
             input=query
         ).data[0].embedding
         
@@ -56,7 +64,7 @@ def test_ecnu_models_niah():
         scores = []
         for doc in haystack:
             doc_emb = client.embeddings.create(
-                model="ecnu-embedding-small",
+                model=ECNU_EMBEDDING_MODEL_NAME,
                 input=doc["content"]
             ).data[0].embedding
             
@@ -77,7 +85,7 @@ def test_ecnu_models_niah():
         return
 
     # 4. Step 2: Reranking (ecnu-rerank)
-    print("\n[Step 2] Reranking (ecnu-rerank)...")
+    print(f"\n[Step 2] Reranking ({ECNU_RERANK_MODEL_NAME})...")
     rerank_url = f"{base_url}/rerank"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -86,7 +94,7 @@ def test_ecnu_models_niah():
     
     # Use all docs for rerank to see if it can pick the needle
     payload = {
-        "model": "ecnu-rerank",
+        "model": ECNU_RERANK_MODEL_NAME,
         "query": query,
         "documents": [doc["content"] for doc in haystack],
         "top_n": 5,
