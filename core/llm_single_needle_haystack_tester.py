@@ -250,10 +250,11 @@ class LLMSingleNeedleHaystackTester:
         """读取并拼接所有原始文本文件形成大上下文。"""
         context = ""
         max_context_length = max(self.context_lengths)
-        base_dir = os.path.abspath(os.path.dirname(__file__))
+        # 使用当前工作目录作为基准，支持从项目根目录运行
+        txt_dir = os.path.abspath(self.haystack_dir)
 
         while self.get_context_length_in_tokens(context) < max_context_length:
-            for file in glob.glob(os.path.join(base_dir, self.haystack_dir, "*.txt")):
+            for file in glob.glob(os.path.join(txt_dir, "*.txt")):
                 with open(file, 'r') as f:
                     context += f.read()
         return context

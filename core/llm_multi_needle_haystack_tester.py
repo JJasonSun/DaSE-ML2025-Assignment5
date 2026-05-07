@@ -71,10 +71,13 @@ class LLMMultiNeedleHaystackTester:
         Returns:
             字典列表：[{\"path\": \"xxx.txt\", \"content\": \"...\", \"tokens\": [...]}, ...]
         """
-        base_dir = os.path.abspath(os.path.dirname(__file__))
-        txt_dir = os.path.join(base_dir, self.haystack_dir)
+        # 使用当前工作目录作为基准，支持从项目根目录运行
+        txt_dir = os.path.abspath(self.haystack_dir)
 
         files = []
+        if not os.path.exists(txt_dir):
+             raise FileNotFoundError(f"Haystack directory not found: {txt_dir}")
+
         for filename in os.listdir(txt_dir):
             if filename.endswith('.txt'):
                 filepath = os.path.join(txt_dir, filename)
