@@ -2,131 +2,220 @@
 
 ## 📌 项目定位
 
-这是一个面向大语言模型（LLM）的**高自动化、可插拔的检索与复杂推理评估平台**。
+面向大语言模型的**自动化、可插拔的长文本检索与复杂推理评测平台**。
 
-在真实的 AI 产品落地中，大模型的长文本理解能力（Context Window）往往伴随着“中间迷失”与“幻觉”。本项目基于强化版的“大海捞针 (Needle in a Haystack)”范式，构建了一套完整的自动化评测管线。通过多维度的测试用例、自动化的评分引擎以及完善的数据分析面板，帮助技术与产品团队深挖模型能力边界、打磨 RAG（检索增强生成）管线，并为产品的模型选型提供数据支撑。
+在真实的 AI 产品落地中，大模型的长文本能力（Context Window）往往伴随着"中间迷失"与"幻觉"。本项目基于强化版的"大海捞针 (Needle in a Haystack)"范式，构建了一套完整的自动化评测管线——从测试用例设计、Agent 策略执行、自动化评分到数据可视化归因，帮助团队深挖模型能力边界、打磨 RAG 管线，并为模型选型提供数据支撑。
 
 ---
 
-## 💡 核心架构与产品思考
+## 💡 核心设计
 
-本项目不只是一个测试脚本，而是一套沉淀了最佳实践的 AI 检索测试产品。
+### 1. 插件式 Agent 架构
 
-### 1. 接口化 Agent 架构（Pluggable Architecture）
-* **实现**：`agents/base_agent.py` 定义了标准化的底层接口，从 baseline 的 `SyncRetrievalAgent` 到复杂的 `AdvancedRetrievalAgent` 均可插拔替换。
-* **产品思考**：评测引擎的生命力在于“解耦”。将其设计为插件式，意味着当我们需要评估全新的大模型、或者测试一种最新的 Prompt 技术时，不需要修改任何评测循环的底层逻辑。研发与产品能以极低的成本（新增一个文件）快速开展对照实验。
+`agents/base_agent.py` 定义了统一接口，所有 Agent 可通过 `--agent` 参数即插即用。新增一个 Agent 只需一个文件，无需改动评测引擎。
 
-### 2. 混合检索管线（Hybrid Retrieval Pipeline）
-* **实现**：在 `AdvancedRetrievalAgent` 内封装了 **BM25关键词粗排 + Dense Embedding向量检索 + Rerank 精排把关** 的黄金三路召回。
-* **产品思考**：为什么不只用纯向量检索？因为在实际业务中我们会发现，纯向量对于同义词很强，但对于“硬规则（如ID、数字、罕见编码）”极易漏召回。将混合检索流水线内置入 Agent，能够探索模型在不同信息信噪比下的鲁棒性，从而反哺真实产品中 RAG 策略的调优。
+### 2. 混合检索管线
 
-### 3. 场景分类与动态路由（Scenario Routing & Dynamic Prompting）
-* **实现**：`ScenarioAwareAgent` 通过小模型（如 ecnu-plus）对用户意图进行前置判别并计算置信度（Confidence），进而动态挂载对应场景（日期推算、逻辑计算等）的专业 Prompt。
-* **产品思考**：One prompt doesn't fit all. 业务落地中 API 成本与准确率是永恒的博弈。通过意图识别+动态路由分发处理流，能在不显著拉高响应时间的前提下，最大化复杂推算题的准召率，这是解决高复杂场景落地的标准架构决策。
+`AdvancedRetrievalAgent` 内置 **BM25 粗排 → Dense Embedding 向量检索 → Rerank 精排** 三路召回。纯向量对同义词强但对 ID、数字等硬规则易漏召回，混合检索能更真实地反映 RAG 生产环境的表现。
 
-### 4. 多维度自动化评分体系（Multi-dimensional Evaluation）
-* **实现**：`evaluators/` 目录下同时提供了精确字符串匹配（`StringMatchEvaluator`）与大模型裁判（`LLMEvaluator`: LLM-as-a-Judge）。
-* **产品思考**：死板的正则匹配很容易将“模型正确但表述不同的答案”误判为 False；而纯人工评估又无法应对上千次的网格化跑分。提供支持“部分正确与语义同构”容忍度的 LLM 裁判，能在高优测试中更精准地反馈模型的情商与逻辑，实现 ROI 的平衡。
+### 3. 场景感知路由
+
+`ScenarioAwareAgent` 先用小模型判别问题类型（日期/计算/编码/字符串），再动态挂载对应场景的专业 Prompt，最大化复杂推理的准确率。
+
+### 4. 双轨评分体系
+
+- **LLM-as-a-Judge**：语义评分 0–10，容忍表述差异，适合深度分析
+- **String Match**：精确匹配 0/1，适合快速测试
+
+---
+
+## 🧪 两种测试模式
+
+平台提供两种测试模式，考察模型的不同能力维度：
+
+### `multi` 模式 — 多文档检索（推荐）
+
+```
+PaulGrahamEssays/           测试用例
+├── essay1.txt              needle_1 ──→ 随机插入 essay3.txt (深度 37%)
+├── essay2.txt              needle_2 ──→ 随机插入 essay7.txt (深度 82%)
+├── essay3.txt  [needle_1]  ...
+├── essay4.txt              Agent 需要从所有文件中检索出全部 needle 并回答
+├── essay5.txt
+├── essay6.txt
+├── essay7.txt  [needle_2]
+└── ...
+```
+
+**做法**：将测试用例中的每条 needle 随机插入到 haystack 的不同文件、不同深度位置。Agent 接收所有文件内容（结构化的 `context_data`），需要跨文件检索并推理。同一用例重复 `num_tests` 次（默认 3），每次插入位置随机变化。
+
+**考察**：多文档场景下的跨文件检索能力、信息聚合与推理能力。更贴近真实 RAG 生产环境。
+
+**适用 Agent**：`AdvancedRetrievalAgent`（有混合检索管线）、`ScenarioAwareAgent`、`SyncRetrievalAgent`
+
+### `single` 模式 — 上下文长度 × 深度扫描
+
+```
+context_length:  1K ──────────────────────── 100K  (10 个梯度)
+depth_percent:   0% ──────────────────────── 100%  (10 个梯度)
+
+                 ┌─────────────────────────────────┐
+  1K × 0%        │ [needle] 无关文本...             │
+  1K × 10%       │ 无关文本 [needle] ...            │
+  ...            │ ...                              │
+  100K × 100%    │ 无关文本...... [needle]           │
+                 └─────────────────────────────────┘
+                 共 100 组测试，自动生成热力图
+```
+
+**做法**：将所有 haystack 文本拼接成一个长字符串，截断到目标 `context_length`，再将 needle 插入到指定 `depth_percent` 位置。遍历所有 (长度, 深度) 组合，形成网格化测试。
+
+**考察**：模型在不同上下文长度下的"记忆"能力、对"中间迷失"现象的抵抗力。输出热力图可直观看到模型在哪个长度/深度区间开始丢失信息。
+
+**适用 Agent**：`SyncRetrievalAgent`（接收纯字符串 `context`）、`AdvancedRetrievalAgent`
+
+### 模式对比
+
+| 维度        | `multi`                               | `single`                       |
+| :---------- | :-------------------------------------- | :------------------------------- |
+| 上下文形式  | 多个独立文件（结构化 `context_data`） | 单个长字符串（`context`）      |
+| Needle 数量 | 多条，分散在不同文件                    | 单条，固定位置                   |
+| 测试维度    | 每个用例重复 N 次，位置随机             | context_length × depth 网格扫描 |
+| 用例数量    | 从题库抽样（默认 20 条）                | 单条用例 × 100 组参数           |
+| 输出可视化  | 柱状图 + 饼图 + Bad Case 归因           | 热力图 (长度 vs 深度)            |
+| 核心场景    | RAG 多文档检索、信息聚合                | 长上下文记忆、位置敏感性         |
+| 推荐用途    | 生产级评测、Agent 能力对比              | 模型能力边界探测、学术研究       |
+
+---
+
+## 📐 评测方法论
+
+### 测试集设计
+
+测试集 `test_cases_all_en.json` 包含 **1600 条**测试用例，按场景类型均衡划分为 4 类，每类 400 条：
+
+| 类型                | 考察维度             | 示例                                                   |
+| :------------------ | :------------------- | :----------------------------------------------------- |
+| `date_time`       | 日期推算与时间差计算 | "项目 A 的部署日期是 2042-10-5，距 11-22 还有多少天？" |
+| `computation`     | 数值计算与逻辑推理   | "根据文中提到的三个增长率，求复合增长后的最终值"       |
+| `encoding`        | 编码识别与解码       | "文中的 Base64 编码字符串解码后是什么？"               |
+| `string_analysis` | 字符串操作与文本分析 | "文中提到的密码字符串中，第 N 个字符是什么？"          |
+
+每次运行时，平台从 1600 条中按类型均衡抽样（默认 20 条，每类 5 条），确保评测结果能全面反映模型在不同推理维度上的能力分布。
+
+### Haystack 干扰机制
+
+每条测试用例的 needle（关键信息）会被随机插入到 Paul Graham Essays 语料库的不同深度位置，模拟真实场景中关键信息被大量无关文本淹没的情况。在 multi 模式下，同一用例重复 `num_tests` 次（默认 3 次），每次插入位置随机变化，以消除位置偏差。
 
 ---
 
 ## 📊 数据驱动的瓶颈与归因分析
 
-本平台支持一键式的评测数据洞察，通过运行 `visualizations/visualize_results.py` 脚本，可将底层 JSON 数据直接凝炼为产品决策报表：
+测试完成后自动生成可视化报表（输出到 `results/` 目录）：
 
-* **大海捞针热力图 (Heatmap)**：通过多维的 Context Length 和 Depth Percent 交叉，直观扫描模型的“记忆黑洞”究竟是在 30k 处还是 80% 深度处。
-* **错误归因饼图 (Performance Pie)**：分析大文档下部分失败（Partial/Fail）的占比分布情况，驱动我们去调整：到底是该换模型，还是该优化 Rerank 分数阈值上限。
+| 图表                                  | 模式   | 说明                                                       |
+| :------------------------------------ | :----- | :--------------------------------------------------------- |
+| **热力图 (Heatmap)**            | single | context_length × depth_percent 交叉，扫描模型的"记忆黑洞" |
+| **得分分布 (Dashboard)**        | multi  | 柱状图（逐题得分）+ 饼图（Good/Partial/Fail 占比）         |
+| **Bad Case 归因 (Attribution)** | both   | 按问题类型拆解得分，定位薄弱维度（哪类问题模型最弱）       |
 
 ---
 
-## 🛠️ 系统架构 (System Architecture)
-
-经过深度解耦重构，项目遵循**中台化、组件化**的设计理念，确保了高可维护性与扩展性：
-
-### 核心分层设计 (Decoupled Components)
-
-*   **`core/` (业务中台层)**:
-    *   `config.py`: 集中式的命令行参数管理与全局配置中心。
-    *   `agent_factory.py`: 采用反射机制实现 Agent 动态加载，支持任意自定义 Agent 的即插即用。
-    *   `health_check.py`: 引入**预检机制 (Health Check)**，在长周期实验开始前自动验证 API 连通性、Embedding 指标、Rerank 响应状态，实现快速失败与调试。
-    *   `runner.py`: 高层测试抽象层，屏蔽了 `Single` 与 `Multi` 模式下的底层差异。
-*   **`agents/` (策略执行层)**: 存放各种不同策略的 LLM 智能体。
-    *   `base_agent.py`: 定义了 `ModelProvider` 抽象基类，规范了所有 Agent 的接口实现。
-    *   `sync_agent.py`: **同步检索 Agent (SyncRetrievalAgent)**。移除了复杂的异步逻辑，通过增强关键词提取与句子级内容抽取，提供高稳定性的基础检索能力。
-    *   `agent_plus.py`: **高级检索 Agent (AdvancedRetrievalAgent)**。集成了混合检索（BM25 + 向量检索）与 Rerank 精排管线，是针对复杂 RAG 场景的生产级实现。
-    *   `scenario_agent.py`: **场景感知 Agent (ScenarioAwareAgent)**。引入意图识别逻辑，根据问题类型动态路由不同的特定场景处理流。
-    *   `agent_template.py`: 开发者模板。供快速扩展自定义 Agent 的参考实现。
-*   **`evaluators/` (质量打分层)**: 定义了多模态（字符串、LLM 评分）的评判逻辑。
-*   **`visualizations/` (数据表现层)**: 负责将海量 JSON 测评指标转化为可视化的热力图与报告明细。
-
-### 项目结构
+## 🛠️ 系统架构
 
 ```text
-├── agents/             # Agent 策略插件系统 (不同检索/推理模型实现)
-├── core/               # 系统核心中台 (配置、工厂、执行引擎与健康预检)
-│   ├── agent_factory.py
-│   ├── config.py
-│   ├── health_check.py
-│   ├── runner.py
-│   └── test_case_loader.py
-├── evaluators/         # 插件式评分引擎 (LLM Judge / String Match)
-├── test_cases/         # 测试题库集
-├── docs/               # 产品路线图、文档与API范例
-├── visualizations/     # 测评数据可视化出图工具
-├── run.py              # 统一命令行调度入口 (Minimal Entrypoint) 🚀
+├── agents/                  # Agent 策略插件
+│   ├── base_agent.py        #   ModelProvider 抽象基类
+│   ├── sync_agent.py        #   SyncRetrievalAgent — 关键词检索
+│   ├── agent_plus.py        #   AdvancedRetrievalAgent — BM25+向量+Rerank
+│   ├── scenario_agent.py    #   ScenarioAwareAgent — 意图识别+动态路由
+│   └── agent_template.py    #   ExampleAgent — 开发者模板
+├── core/                    # 系统核心
+│   ├── config.py            #   命令行参数配置
+│   ├── agent_factory.py     #   Agent 动态加载
+│   ├── runner.py            #   测试执行引擎
+│   ├── test_case_loader.py  #   测试用例加载与均衡抽样
+│   ├── health_check.py      #   API 连通性预检
+│   └── visualize.py         #   可视化出图
+├── evaluators/              # 评分引擎
+│   ├── evaluator.py         #   Evaluator 基类
+│   ├── llm_evaluator.py     #   LLM-as-a-Judge (0-10 语义评分)
+│   └── string_match_evaluator.py  #   精确匹配 (0/1)
+├── test_cases/              # 测试题库
+├── run.py                   # 统一命令行入口
 └── requirements.txt
+```
+
+### Agent 继承关系
+
+```
+ModelProvider (base_agent.py)
+├── ExampleAgent (agent_template.py)      — 随机 baseline
+├── SyncRetrievalAgent (sync_agent.py)    — 关键词检索 + 句子级抽取
+└── AdvancedRetrievalAgent (agent_plus.py) — BM25 + 向量 + Rerank 混合检索
+    └── ScenarioAwareAgent (scenario_agent.py) — 意图识别 + 动态 Prompt 路由
 ```
 
 ---
 
 ## 🚀 快速开始
 
-### 环境配置 `.env`
+### 1. 环境配置
 
-请确保你的 `.env` 只保留 ECNU 相关配置。主测模型可手动改成 `ecnu-max`，其余 helper / 评测场景固定使用 `ecnu-plus`：
+创建 `.env` 文件：
 
 ```env
-# ECNU-only runtime configuration
 ECNU_API_KEY=sk-xxxx
 ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
 MODEL_NAME=ecnu-max
 ```
 
-### 运行自动化评测
-
-启动主入口 `run.py` 进行 NIAH 多用例评测（Windows 推荐使用单行命令）：
+安装依赖：
 
 ```bash
-# 启动混合检索及深层推断 (AdvancedRetrievalAgent)
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --test_case_json test_cases/test_cases_all_en.json --test_mode multi --evaluator_type llm --num_tests 1 --save_results True
-
-# 启动场景路由感知策略 (ScenarioAwareAgent)
-uv run python run.py --agent agents.scenario_agent:ScenarioAwareAgent --test_case_json test_cases/test_cases_all_en.json --test_mode multi --evaluator_type llm --num_tests 1 --save_results True
+uv pip install -r requirements.txt
 ```
 
-单独说明一下模式选择：single 模式走的是“纯上下文字符串”，更适合 `SyncRetrievalAgent`；`AdvancedRetrievalAgent` 这种吃 `context_data` 的，得用 multi 模式。
-
-#### 参数详细说明 (Parameter Reference)
-
-| 参数名 | 必填 | 默认值 | 说明 |
-| :--- | :---: | :--- | :--- |
-| `--agent` | 是 | - | 指定 Agent 的路径，格式为 `module.path:ClassName` |
-| `--test_case_json` | 是 | - | 指向测评题库的 JSON 文件路径 |
-| `--test_mode` | 否 | `multi` | 测评模式：`multi` (多文档多针) 或 `single` (纯上下文字符串) |
-| `--evaluator_type` | 否 | `llm` | 评分器类型：`llm` (语义化 Judge) 或 `string` (全匹配) |
-| `--num_tests` | 否 | `5` | 在 `multi` 模式下，针对每个题目循环执行的随机试验次数 |
-| `--save_results` | 否 | `False` | 是否将测评数据保存至 `results/` 文件夹 |
-| `--results_version` | 否 | `1` | 实验版本号，用于在 `results/` 中区分不同的实验批次 |
-| `--skip_model_test` | 否 | `False` | 是否跳过开始前的网络与 API 健康检查 (建议调试时开启) |
-| `--haystack_dir` | 否 | `PaulGrahamEssays` | 干扰库 (Haystack) 的文本文件目录 |
-
-### 基础连通性测试 (Baseline Test)
-
-使用精简版题库快速验证 Agent 的基础检索与评分逻辑：
+### 2. 运行评测
 
 ```bash
-# 使用同步测试 Agent 运行基础测试 (test_cases.json)
-uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --test_case_json test_cases/test_cases.json --test_mode single --evaluator_type string --num_tests 1
+# 推荐：multi 模式 + AdvancedRetrievalAgent（默认抽样 20 条，每条跑 3 次）
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent
+
+# 场景感知路由 Agent
+uv run python run.py --agent agents.scenario_agent:ScenarioAwareAgent
+
+# 抽样 50 条测试用例
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 50
+
+# single 模式：扫描上下文长度 × 深度的热力图
+uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --test_mode single
+
+# 快速冒烟测试（跳过健康检查，5 条用例，精确匹配）
+uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --num_samples 5 --test_mode single --evaluator_type string --num_tests 1 --skip_model_test True
 ```
 
-_注：项目启动时会优先运行模型健康连通性检查（Health Check），确保网络及 API 接口调通后才会进入耗时的测试流程（调试期间可追加 `--skip_model_test True` 跳过该检查）。_
+### 3. 参数说明
+
+| 参数                  | 默认值                                | 说明                                                   |
+| :-------------------- | :------------------------------------ | :----------------------------------------------------- |
+| `--agent`           | *(必填)*                            | Agent 路径，格式 `module.path:ClassName`             |
+| `--test_case_json`  | `test_cases/test_cases_all_en.json` | 测试题库 JSON 路径                                     |
+| `--num_samples`     | `20`                                | 从题库中按类型均衡抽样的用例数                         |
+| `--test_mode`       | `multi`                             | 测试模式：`multi`（多文档）或 `single`（网格扫描） |
+| `--evaluator_type`  | `llm`                               | 评分器：`llm`（语义评分）或 `string`（精确匹配）   |
+| `--num_tests`       | `3`                                 | multi 模式下每个用例的重复试验次数                     |
+| `--skip_model_test` | `False`                             | 跳过 API 健康检查（调试时使用）                        |
+| `--haystack_dir`    | `PaulGrahamEssays`                  | 干扰库文本文件目录                                     |
+| `--visualize`       | `True`                              | 测试完成后自动生成可视化                               |
+
+---
+
+## 🔌 扩展：添加自定义 Agent
+
+1. 在 `agents/` 下创建 `your_agent.py`
+2. 继承 `ModelProvider`（或 `AdvancedRetrievalAgent` 以复用混合检索）
+3. 实现 `async evaluate_model(prompt: Dict) -> str`
+4. 运行时指定 `--agent agents.your_agent:YourAgent`
+
+详见 `agents/agent_template.py` 的最小参考实现。

@@ -5,10 +5,12 @@ from typing import Optional
 class CommandArgs:
     """命令行参数配置"""
     agent: str  # Agent 指定，格式为 "module.path:ClassName"，例如：agents.agent_template:ExampleAgent
-    test_case_json: str  # 测试用例 JSON 文件路径。支持单个用例或包含多个用例的数组/封装结构
 
     api_key: Optional[str] = None  # 可选：覆盖环境变量中的 API_KEY（命令行优先）
     base_url: Optional[str] = None  # 可选：覆盖环境变量中的 BASE_URL（命令行优先）
+
+    test_case_json: Optional[str] = None  # 测试用例 JSON 路径（默认使用 test_cases/test_cases_all_en.json）
+    num_samples: Optional[int] = 20  # 从测试题库中随机抽取的用例数（按类型均衡抽样）
 
     test_mode: Optional[str] = "multi"  # 测试模式：'multi'（多文档，多 needle）或 'single'（单文档，单 needle）
     evaluator_type: Optional[str] = "llm"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
@@ -16,7 +18,7 @@ class CommandArgs:
     results_version: Optional[int] = 1  # 结果保存的版本号，用于区分不同实验批次
 
     # 多文档（multi）模式相关参数：
-    num_tests: Optional[int] = 5  # 每个测试用例执行的随机试验次数（每次 needle 插入位置不同）
+    num_tests: Optional[int] = 3  # 每个测试用例执行的随机试验次数（每次 needle 插入位置不同）
 
     # 单文档（single）模式下用于扫描不同上下文长度的参数（以 token 计）：
     context_lengths_min: Optional[int] = 1000  # 最小上下文长度（token）

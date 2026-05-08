@@ -1,5 +1,7 @@
 import json
-from typing import Dict, List, Union
+import random
+from collections import defaultdict
+from typing import Dict, List, Optional
 
 
 def load_test_cases(json_path: str) -> List[Dict]:
@@ -60,17 +62,48 @@ def load_test_case(json_path: str) -> Dict:
 
 
 def get_needles(test_case: Dict) -> List[str]:
-    """
-    从测试用例中提取 needle。
-
-    Args:
-        test_case: 测试用例字典
-
-    Returns:
-        needle 字符串列表
-    """
     needle = test_case['needle']
     if isinstance(needle, list):
         return needle
     else:
         return [needle]
+
+
+def sample_test_cases(cases: List[Dict], n: int, seed: Optional[int] = None) -> List[Dict]:
+    """
+    Sample n test cases balanced across 'type' categories.
+
+    Args:
+        cases: Full list of test cases (must have 'type' field).
+        n: Number of cases to sample.
+        seed: Optional random seed for reproducibility.
+
+    Returns:
+        Sampled list of test cases.
+    """
+    if n >= len(cases):
+        return cases
+
+    rng = random.Random(seed)
+
+    # Group by type
+    by_type = defaultdict(list)
+    for c in cases:
+        by_type[c.get("type", "unknown")].append(c)
+
+    types = sorted(by_type.keys())
+    num_types = len(types)
+
+    # Balanced allocation: each type gets floor(n/num_types), remainder distributed
+    base_per_type = n // num_types
+    remainder = n % num_types
+    allocation = {t: base_per_type + (1 if i < remainder else 0) for i, t in enumerate(types)}
+
+    sampled = []
+    for t in types:
+        pool = by_type[t]
+        k = min(allocation[t], len(pool))
+        sampled.extend(rng.sample(pool, k))
+
+    rng.shuffle(sampled)
+    return sampled

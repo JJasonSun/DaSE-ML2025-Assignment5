@@ -7,7 +7,7 @@ from core.ecnu_constants import DEFAULT_ECNU_BASE_URL
 from core.config import CommandArgs
 from core.health_check import check_models
 from core.runner import run_single_test_case
-from core.test_case_loader import load_test_cases, get_needles
+from core.test_case_loader import load_test_cases, get_needles, sample_test_cases
 
 load_dotenv()
 
@@ -31,11 +31,18 @@ def main():
     if not args.skip_model_test:
         check_models(api_key, base_url, args.evaluator_type)
 
-    # 加载所有测试用例
-    test_cases = load_test_cases(args.test_case_json)
+    # 加载测试用例（默认使用 test_cases_all_en.json）
+    default_test_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_cases', 'test_cases_all_en.json')
+    test_case_json = args.test_case_json or default_test_file
+    test_cases = load_test_cases(test_case_json)
+
+    # 按类型均衡抽样
+    if args.num_samples and args.num_samples < len(test_cases):
+        test_cases = sample_test_cases(test_cases, args.num_samples)
+        print(f"\nSampled {len(test_cases)} test cases (balanced across types)")
 
     print("\n" + "=" * 80)
-    print(f"Loaded {len(test_cases)} test case(s) from {args.test_case_json}")
+    print(f"Test cases: {len(test_cases)} (from {os.path.basename(test_case_json)})")
     print(f"Evaluator Type: {args.evaluator_type}")
     print("=" * 80)
 
@@ -67,9 +74,10 @@ def main():
                 args=args
             )
 
-            # 将测试用例 ID 加入每条结果
+            # 将测试用例 ID 和类型加入每条结果
             for result in results:
                 result['test_case_id'] = test_id
+                result['test_case_type'] = test_case.get('type', 'unknown')
 
             all_results.extend(results)
 

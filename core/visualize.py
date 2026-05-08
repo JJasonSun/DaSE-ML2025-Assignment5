@@ -115,6 +115,70 @@ def visualize_multi_needle(results: List[dict], output_dir: str) -> Optional[str
     return path
 
 
+def visualize_bad_case_attribution(results: List[dict], output_dir: str) -> Optional[str]:
+    """Generate a bad case attribution chart grouped by question type."""
+    records = [r for r in results if "test_case_type" in r and "score" in r]
+    if not records:
+        print("[Visualize] No type-tagged results for bad case attribution.")
+        return None
+
+    df = pd.DataFrame(records)
+    df["score"] = df["score"].astype(float)
+    model = df["model"].iloc[0] if "model" in df.columns else "Unknown"
+
+    # Aggregate by type
+    by_type = df.groupby("test_case_type").agg(
+        mean_score=("score", "mean"),
+        count=("score", "size"),
+        bad_count=("score", lambda s: (s < 4).sum()),
+    ).sort_values("mean_score")
+
+    if by_type.empty:
+        return None
+
+    fig, (ax_bar, ax_bad) = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={"width_ratios": [3, 2]})
+
+    # --- Left: mean score per type ---
+    colors = [PALETTE[3] if m < 4 else PALETTE[1] if m < 8 else PALETTE[2] for m in by_type["mean_score"]]
+    bars = ax_bar.barh(by_type.index, by_type["mean_score"], color=colors, edgecolor="white", linewidth=0.5)
+    ax_bar.axvline(8, color="green", linestyle=":", linewidth=0.8, alpha=0.5, label="Good threshold")
+    ax_bar.axvline(4, color="red", linestyle=":", linewidth=0.8, alpha=0.5, label="Fail threshold")
+    ax_bar.set_xlim(0, 10.5)
+    ax_bar.set_xlabel("Mean Score", fontsize=11)
+    ax_bar.set_title("Mean Score by Question Type", fontsize=12)
+    ax_bar.legend(fontsize=9)
+
+    for bar, val in zip(bars, by_type["mean_score"]):
+        ax_bar.text(val + 0.15, bar.get_y() + bar.get_height() / 2, f"{val:.1f}",
+                    va="center", fontsize=10, fontweight="bold")
+
+    # --- Right: bad case count per type ---
+    has_bad = by_type["bad_count"].sum() > 0
+    if has_bad:
+        bad_colors = [PALETTE[3] if c > 0 else PALETTE[2] for c in by_type["bad_count"]]
+        ax_bad.barh(by_type.index, by_type["bad_count"], color=bad_colors, edgecolor="white", linewidth=0.5)
+        ax_bad.set_xlabel("Bad Cases (score < 4)", fontsize=11)
+        ax_bad.set_title("Bad Case Count by Type", fontsize=12)
+        for i, (idx, row) in enumerate(by_type.iterrows()):
+            ax_bad.text(row["bad_count"] + 0.1, i, f"{int(row['bad_count'])}/{int(row['count'])}",
+                        va="center", fontsize=10)
+    else:
+        ax_bad.text(0.5, 0.5, "No bad cases!", transform=ax_bad.transAxes,
+                    ha="center", va="center", fontsize=14, color="green", fontweight="bold")
+        ax_bad.set_title("Bad Case Count by Type", fontsize=12)
+        ax_bad.set_yticks([])
+
+    fig.suptitle(f"Bad Case Attribution — {model}", fontsize=14, y=1.02)
+    fig.tight_layout()
+
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, f"bad_case_attribution_{model}.png")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"[Visualize] Saved bad case attribution to {path}")
+    return path
+
+
 def auto_visualize(results: List[dict], test_mode: str, output_dir: str) -> List[str]:
     """Automatically visualize results based on test mode."""
     if not results:
@@ -130,4 +194,10 @@ def auto_visualize(results: List[dict], test_mode: str, output_dir: str) -> List
         path = visualize_multi_needle(results, output_dir)
         if path:
             saved.append(path)
+
+    # Bad case attribution (both modes)
+    path = visualize_bad_case_attribution(results, output_dir)
+    if path:
+        saved.append(path)
+
     return saved
