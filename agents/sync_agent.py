@@ -86,12 +86,7 @@ class SyncRetrievalAgent(ModelProvider):
 
             response = await self._create_chat_completion(
                 messages=messages,
-                temperature=1,
-                top_p=0.95,
-                max_tokens=8000,
-                timeout=180,
-                enable_thinking=True,
-                thinking_budget_tokens=4000,
+                enable_thinking=getattr(self, 'enable_thinking', False),
             )
 
             if response and response.strip():

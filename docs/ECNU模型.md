@@ -74,15 +74,10 @@
 
 为保持历史兼容，平台仍保留原有模型名称。新接入应用建议优先使用 `ecnu-max` 或 `ecnu-plus`。
 
-| 历史模型名             | 当前等价模型                                      | 说明                         |
-| ---------------------- | ------------------------------------------------- | ---------------------------- |
-| `ecnu-reasoner`      | `ecnu-max` + `thinking: {"type": "enabled"}`  | 默认开启思考模式的 ecnu-max  |
-| `ecnu-reasoner-lite` | `ecnu-plus` + `thinking: {"type": "enabled"}` | 默认开启思考模式的 ecnu-plus |
-| `ecnu-turbo`         | `ecnu-plus`                                     | 历史兼容别名                 |
-| `ecnu-vl`            | `ecnu-plus`                                     | 历史兼容别名                 |
-| `InnoSpark`          | `ecnu-plus`                                     | 历史兼容别名                 |
-| `educhat-r1`         | `ecnu-plus`                                     | 历史兼容别名                 |
-| `educhat-general`    | `ecnu-plus`                                     | 历史兼容别名                 |
-| `educhat-psychology` | `ecnu-plus`                                     | 历史兼容别名                 |
-| `ChatECNU`           | `ecnu-plus`                                     | 历史兼容别名                 |
-| `gpt-4`              | `ecnu-plus`                                     | 兼容 `gpt-4` 的历史模型名  |
+
+## 向量和重排模型
+
+| 模型名                   | 底层模型                                                                | 能力说明                  | 上下文 | [配额倍率](https://developer.ecnu.edu.cn/vitepress/llm/limit.html) |
+| ------------------------ | ----------------------------------------------------------------------- | ------------------------- | ------ | --------------------------------------------------------------- |
+| `ecnu-embedding-small` | [bge-m3](https://modelscope.cn/models/BAAI/bge-m3)                         | 通用文本向量能力，1024 维 | 8K     | 0.05x                                                           |
+| `ecnu-rerank`          | [bge-reranker-v2-m3](https://modelscope.cn/models/BAAI/bge-reranker-v2-m3) | 通用文本重排序            | 8K     | 0.1x                                                            |

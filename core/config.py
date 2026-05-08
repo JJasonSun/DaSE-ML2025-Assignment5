@@ -30,6 +30,9 @@ class CommandArgs:
     document_depth_percent_max: Optional[int] = 100  # 插入深度最大值（100 = 文档末尾）
     document_depth_percent_intervals: Optional[int] = 10  # 深度划分区间数
 
+    # 模型行为：
+    enable_thinking: Optional[bool] = False  # 是否开启模型思考模式（Extended Thinking）
+
     # 输出控制：
     save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
     print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）

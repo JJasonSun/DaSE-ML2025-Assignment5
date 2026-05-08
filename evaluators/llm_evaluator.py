@@ -39,9 +39,7 @@ Score 10: The answer is completely accurate and matches the ground truth.
                  "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0,
-            max_tokens=10,
-            extra_body=extra_body if extra_body else None
+            extra_body=extra_body,
         )
         if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
             return None

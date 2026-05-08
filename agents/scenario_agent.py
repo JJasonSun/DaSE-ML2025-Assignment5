@@ -110,10 +110,8 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
         response = await self._create_chat_completion(
             messages=messages,
             model=ECNU_PLUS_MODEL_NAME,
-            temperature=0,
-            max_tokens=100,
             enable_thinking=False,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
         )
         
         try:

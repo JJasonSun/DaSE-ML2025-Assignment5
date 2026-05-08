@@ -24,7 +24,7 @@
 
 ### 4. 双轨评分体系
 
-- **LLM-as-a-Judge**：语义评分 0–10，容忍表述差异，适合深度分析
+- **LLM-as-a-Judge**（`ecnu-plus`）：语义评分 0–10，容忍表述差异，适合深度分析
 - **String Match**：精确匹配 0/1，适合快速测试
 
 ---
@@ -167,8 +167,17 @@ ModelProvider (base_agent.py)
 ```env
 ECNU_API_KEY=sk-xxxx
 ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
-MODEL_NAME=ecnu-max
+MODEL_NAME=ecnu-max       # 主测模型，可改为 ecnu-plus
 ```
+
+平台使用 ECNU 提供的模型服务，所有模型均在校内部署：
+
+| 模型 | 用途 | 底层模型 | 上下文 |
+|:---|:---|:---|:---|
+| `ecnu-max` | 主测模型（可通过 `MODEL_NAME` 切换） | DeepSeek-V4-Flash | 1M |
+| `ecnu-plus` | 评分器 / 场景分类 / Helper | Qwen3.6-27B | 256K |
+| `ecnu-embedding-small` | Dense 向量检索（1024 维） | bge-m3 | 8K |
+| `ecnu-rerank` | Rerank 精排 | bge-reranker-v2-m3 | 8K |
 
 安装依赖：
 
@@ -193,6 +202,9 @@ uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --test_mode si
 
 # 快速冒烟测试（跳过健康检查，5 条用例，精确匹配）
 uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --num_samples 5 --test_mode single --evaluator_type string --num_tests 1 --skip_model_test True
+
+# 开启思考模式（Extended Thinking），提升复杂推理准确率
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --enable_thinking True
 ```
 
 ### 3. 参数说明
@@ -205,6 +217,7 @@ uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --num_samples 
 | `--test_mode`       | `multi`                             | 测试模式：`multi`（多文档）或 `single`（网格扫描） |
 | `--evaluator_type`  | `llm`                               | 评分器：`llm`（语义评分）或 `string`（精确匹配）   |
 | `--num_tests`       | `3`                                 | multi 模式下每个用例的重复试验次数                     |
+| `--enable_thinking` | `False`                             | 开启模型思考模式（Extended Thinking），提升推理质量但增加延迟 |
 | `--skip_model_test` | `False`                             | 跳过 API 健康检查（调试时使用）                        |
 | `--haystack_dir`    | `PaulGrahamEssays`                  | 干扰库文本文件目录                                     |
 | `--visualize`       | `True`                              | 测试完成后自动生成可视化                               |

@@ -25,8 +25,9 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
     """
     needles = get_needles(test_case)
 
-    # 加载 Agent
+    # 加载 Agent 并注入 enable_thinking 配置
     agent = load_agent(agent_spec, api_key, base_url)
+    agent.enable_thinking = args.enable_thinking
 
     # 根据类型初始化评测器
     if args.evaluator_type == 'llm':
