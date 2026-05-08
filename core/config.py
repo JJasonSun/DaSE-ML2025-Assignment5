@@ -29,7 +29,7 @@ class CommandArgs:
     document_depth_percent_intervals: Optional[int] = 10  # 深度划分区间数
 
     # 输出控制：
-    save_results: Optional[bool] = False  # 是否将每次测试结果保存到 results/（json 文件）
     save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
     print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）
     skip_model_test: Optional[bool] = False  # 是否跳过运行前的模型健康检查
+    visualize: Optional[bool] = True  # 测试完成后是否自动生成可视化图表

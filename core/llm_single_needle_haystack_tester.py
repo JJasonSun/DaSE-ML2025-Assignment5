@@ -1,6 +1,5 @@
 import asyncio
 import glob
-import json
 import os
 import time
 
@@ -35,7 +34,6 @@ class LLMSingleNeedleHaystackTester:
                  document_depth_percents=None,
                  document_depth_percent_interval_type="linear",
                  num_concurrent_requests=1,
-                 save_results=True,
                  save_contexts=False,
                  final_context_length_buffer=200,
                  seconds_to_sleep_between_completions=None,
@@ -52,7 +50,6 @@ class LLMSingleNeedleHaystackTester:
         self.question = question
         self.results_version = results_version
         self.num_concurrent_requests = num_concurrent_requests
-        self.save_results = save_results
         self.final_context_length_buffer = final_context_length_buffer
         self.save_contexts = save_contexts
         self.seconds_to_sleep_between_completions = seconds_to_sleep_between_completions
@@ -125,13 +122,6 @@ class LLMSingleNeedleHaystackTester:
         await asyncio.gather(*tasks)
 
     async def evaluate_and_log(self, context_length, depth_percent):
-        """
-        在指定的上下文长度与深度下评估模型并记录结果。
-        """
-        if self.save_results:
-            if self.result_exists(context_length, depth_percent):
-                return
-
         context = await self.generate_context(context_length, depth_percent)
 
         prompt = self.model_to_test.generate_prompt(
@@ -181,33 +171,8 @@ class LLMSingleNeedleHaystackTester:
             with open(f'contexts/{context_file_location}_context.txt', 'w', encoding='utf-8') as f:
                 f.write(context)
 
-        if self.save_results:
-            if not os.path.exists('results'):
-                os.makedirs('results')
-
-            with open(f'results/{context_file_location}_results.json', 'w', encoding='utf-8') as f:
-                json.dump(results, f)
-
         if self.seconds_to_sleep_between_completions:
             await asyncio.sleep(self.seconds_to_sleep_between_completions)
-
-    def result_exists(self, context_length, depth_percent):
-        """检查指定参数的结果文件是否已经存在。"""
-        results_dir = 'results/'
-        if not os.path.exists(results_dir):
-            return False
-
-        for filename in os.listdir(results_dir):
-            if filename.endswith('.json'):
-                with open(os.path.join(results_dir, filename), 'r', encoding='utf-8') as f:
-                    result = json.load(f)
-                    context_length_met = result['context_length'] == context_length
-                    depth_percent_met = result['depth_percent'] == depth_percent
-                    version_met = result.get('version', 1) == self.results_version
-                    model_met = result['model'] == self.model_name
-                    if context_length_met and depth_percent_met and version_met and model_met:
-                        return True
-        return False
 
     async def generate_context(self, context_length, depth_percent):
         """生成插入 needle 且达到目标深度的上下文。"""

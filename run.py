@@ -107,5 +107,15 @@ def main():
         print(f"\nOverall Mean Score: {overall_mean:.2f}")
     print("=" * 80)
 
+    # Auto-visualize results
+    if args.visualize and all_results:
+        from core.visualize import auto_visualize
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
+        saved = auto_visualize(all_results, args.test_mode, output_dir)
+        if saved:
+            print(f"\nVisualization saved to:")
+            for p in saved:
+                print(f"  {p}")
+
 if __name__ == '__main__':
     main()

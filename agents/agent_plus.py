@@ -1,4 +1,3 @@
-import asyncio
 import json
 import math
 import os
@@ -6,16 +5,13 @@ import re
 from typing import Dict, List, Optional, Union, cast
 
 import requests
-import tiktoken
 from dotenv import load_dotenv
-from openai import OpenAI
 from rank_bm25 import BM25Okapi
 
 from core.ecnu_constants import (
     DEFAULT_ECNU_BASE_URL,
     ECNU_EMBEDDING_MODEL_NAME,
     ECNU_MAIN_MODEL_NAME,
-    ECNU_PLUS_MODEL_NAME,
     ECNU_RERANK_MODEL_NAME,
 )
 from .base_agent import ModelProvider
@@ -23,11 +19,8 @@ from .base_agent import ModelProvider
 
 class AdvancedRetrievalAgent(ModelProvider):
     """
-    长文本检索 Agent（设想2版）：
-    - Token 级切分：chunk_size=500，overlap=100
-    - 混合召回：BM25(精确匹配) + Dense(语义匹配)
-    - 精排：ecnu-rerank 选 Top-N（默认 8）
-    - 生成：ecnu-max；当总上下文较小（<30000 tokens）直接全量喂给模型
+    Hybrid retrieval agent: BM25 + Dense Embedding + Rerank.
+    Falls back to full-context mode when total tokens < 64K.
     """
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
@@ -37,10 +30,8 @@ class AdvancedRetrievalAgent(ModelProvider):
         base_url = base_url or os.getenv("ECNU_BASE_URL") or DEFAULT_ECNU_BASE_URL
         super().__init__(api_key=api_key, base_url=base_url)
 
-        self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model_name = os.getenv("MODEL_NAME") or ECNU_MAIN_MODEL_NAME
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
         self.embedding_model = ECNU_EMBEDDING_MODEL_NAME
         self.rerank_model = ECNU_RERANK_MODEL_NAME
@@ -54,102 +45,34 @@ class AdvancedRetrievalAgent(ModelProvider):
         self.full_context_threshold_tokens = 64000
         self.max_evidence_tokens = 32000
 
-        self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.prompts = self._load_prompts()
 
     def _load_prompts(self) -> Dict[str, str]:
         return {
             "system_prompt": (
-                "你是一名严谨的长文检索与推理专家，任务是完成大海捞针（Needle in a Haystack）场景：在海量上下文中精准定位并推导出答案。\n\n"
-                "【工作准则】\n"
-                "1) 专注依据：只使用提供的上下文与通用推理/计算能力，禁止引入无关外部知识。\n"
-                "2) 结构化思考：先拆解问题，再定位线索，逐步演绎，验证约束。\n"
-                "3) 积极求解：遇到日期需推算星期、数值需运算时，积极执行深度推导计算，并保证准确。\n"
-                "4) 输出策略：请先明确给出最终答案，然后输出关键的推理过程和相关信息。\n"
-                "5) 结果兜底：若穷尽检索与计算仍无结果，请直接返回 \"Unknown\"。\n"
-                "6) 容错与坚持：信息被遮蔽、分散或需跨段推理时，保持耐心与严密逻辑，避免遗漏。\n\n"
-                "【简要流程】分析需求 → 搜索/对齐证据 → 必要时执行精确计算 → 交叉校验 → 先输出答案再输出推理过程。"
+                "You are a meticulous retrieval and reasoning expert operating in a Needle-in-a-Haystack scenario: "
+                "your task is to locate precise evidence within a vast context and derive the correct answer.\n\n"
+                "## Principles\n"
+                "1. Grounding: Use ONLY the provided context combined with general reasoning and arithmetic. "
+                "Do NOT introduce external knowledge or assumptions.\n"
+                "2. Internal reasoning: Decompose the problem, locate evidence, and verify — all internally. "
+                "Never output your reasoning process, chain-of-thought, or intermediate steps.\n"
+                "3. Active computation: When dates require weekday calculation or numbers require arithmetic, "
+                "perform the computation internally and ensure accuracy.\n"
+                "4. Output format: Output ONLY the final answer. No explanations, no restating evidence, "
+                "no bullet points, no prefixes like \"The answer is\", no reasoning traces.\n"
+                "5. Fallback: If after exhaustive retrieval and computation no answer can be determined, "
+                "return exactly \"Unknown\".\n"
+                "6. Resilience: Evidence may be fragmented, obscured, or scattered across passages. "
+                "Stay patient, apply rigorous logic, and avoid premature abandonment.\n\n"
+                "## Workflow\n"
+                "Analyze the question → locate and align evidence → compute if necessary → cross-verify → output only the final answer."
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "请给出你的分析和答案。"
+                "Output only the final answer. No explanation."
             ),
         }
-
-    # -------------------------- Chat helpers -------------------------- #
-    async def _create_chat_completion(
-        self,
-        messages: List[Dict],
-        model: Optional[str] = None,
-        temperature: float = 0,
-        max_tokens: int = 800,
-        timeout: int = 60,
-        response_format: Optional[Dict] = None,
-        enable_thinking: bool = False,
-        thinking_budget_tokens: int = 1024,
-        top_p: float = 1.0,
-    ) -> str:
-        model_to_use = model or self.model_name
-        params: Dict = {
-            "model": model_to_use,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "timeout": timeout,
-            "top_p": top_p,
-        }
-        if response_format:
-            params["response_format"] = response_format
-
-        extra_body: Dict = {}
-        if enable_thinking:
-            print(f"本次任务对模型 {model_to_use} 开启深度思考")
-            extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
-        else:
-            extra_body["thinking"] = {"type": "disabled"}
-        
-        if extra_body:
-            params["extra_body"] = extra_body
-
-        client_to_use = self.client
-
-        def _sync_call():
-            return client_to_use.chat.completions.create(**params)
-
-        try:
-            try:
-                completion = await asyncio.to_thread(_sync_call)
-            except AttributeError:
-                loop = asyncio.get_running_loop()
-                completion = await loop.run_in_executor(None, _sync_call)
-            raw = completion.to_dict()
-            print(f"[Debug] Raw response: {raw}")
-            return self._extract_content_from_response(raw)
-        except Exception as exc:
-            return f"API error: {exc}" if exc else "API error"
-
-    def _extract_content_from_response(self, result: dict) -> str:
-        try:
-            choice = result.get("choices", [{}])[0]
-            message = choice.get("message", {})
-            content = message.get("content", "")
-            reasoning = message.get("reasoning_content", "")
-            finish_reason = choice.get("finish_reason", "unknown")
-
-            if isinstance(content, str) and content.strip():
-                return content.strip()
-            
-            # 如果 content 为空但有 reasoning_content，可能是因为思维链过长导致截断
-            # 尝试返回思维链内容作为回答
-            if isinstance(reasoning, str) and reasoning.strip():
-                print(f"[Debug] Content is empty, but reasoning_content found (finish_reason: {finish_reason})")
-                return reasoning.strip()
-
-            return f"Empty response (finish_reason: {finish_reason})"
-        except Exception as e:
-            return f"Response parsing error: {str(e)[:80]}"
-
-
 
     # -------------------------- ModelProvider API -------------------------- #
     async def evaluate_model(self, prompt: Dict) -> str:
@@ -159,8 +82,7 @@ class AdvancedRetrievalAgent(ModelProvider):
             return "Missing required input data"
 
         full_context = self._build_full_context(context_data)
-        
-        # 1. 初次尝试：使用原始问题进行检索
+
         total_context_tokens = int(full_context["total_tokens"])
         if total_context_tokens <= self.full_context_threshold_tokens:
             context_for_llm = full_context["text"]
@@ -175,31 +97,16 @@ class AdvancedRetrievalAgent(ModelProvider):
             {"role": "user", "content": user_template.format(context=context_for_llm, question=question)},
         ]
 
-        # 1. 第一次尝试
         response_raw = await self._create_chat_completion(
             messages=messages,
             temperature=1,
             top_p=0.95,
             max_tokens=16000,
             timeout=180,
-            # response_format={"type": "json_object"}, # REMOVED
             enable_thinking=True,
             thinking_budget_tokens=8000,
         )
-        answer = response_raw.strip()
-
-        return self.compress_final_answer(answer)
-
-    def generate_prompt(self, **kwargs) -> Dict:
-        return {"context_data": kwargs.get("context_data"), "question": kwargs.get("question")}
-
-    def encode_text_to_tokens(self, text: str) -> List[int]:
-        return self.tokenizer.encode(text or "")
-
-    def decode_tokens(self, tokens: List[int], context_length: Optional[int] = None) -> str:
-        if context_length is not None:
-            tokens = tokens[:context_length]
-        return self.tokenizer.decode(tokens)
+        return self.finalize_answer(response_raw.strip())
 
     # -------------------------- Full-context mode -------------------------- #
     def _build_full_context(self, context_data: Dict) -> Dict[str, Union[str, int]]:
@@ -214,43 +121,7 @@ class AdvancedRetrievalAgent(ModelProvider):
         return {"text": "\n\n".join(parts), "total_tokens": total_tokens}
 
     # -------------------------- Retrieval pipeline -------------------------- #
-    async def _expand_query(self, question: str) -> List[str]:
-        """
-        生成 3 个多样化的搜索查询，以提高 NIAH 任务的召回率。
-        """
-        prompt = (
-            "你是一个搜索专家。给定一个问题，请生成 3 个多样化的搜索查询，"
-            "以帮助在大文档中找到答案。重点关注不同的关键词和表述方式。"
-            "仅返回一个 JSON 字符串列表。\n\n"
-            f"问题: {question}\n\n"
-            "查询列表:"
-        )
-        messages = [{"role": "user", "content": prompt}]
-
-        # 使用 ECNU-plus 进行查询扩展（若未来启用该辅助路径）
-        response = await self._create_chat_completion(
-            messages=messages,
-            model=ECNU_PLUS_MODEL_NAME,
-            temperature=0.3,
-            max_tokens=150,
-            enable_thinking=False
-        )
-        match = re.search(r"\[.*\]", response, re.DOTALL)
-        if not match:
-            raise ValueError(f"Failed to parse query expansion response: {response[:120]}")
-
-        queries = json.loads(match.group(0))
-        if isinstance(queries, list) and len(queries) > 0:
-            if question not in queries:
-                queries.append(question)
-            return queries[:4]
-
-        raise ValueError("ECNU-plus returned an empty query expansion list")
-
     def _retrieve_with_hybrid(self, question: str, context_data: Dict, queries: Optional[List[str]] = None) -> Dict[str, str]:
-        """
-        Hybrid retrieval: BM25 + Vector + Rerank. Supports multi-query expansion.
-        """
         files = context_data.get("files", []) or []
         if not files:
             return {"evidence_text": "No relevant content found."}
@@ -268,15 +139,12 @@ class AdvancedRetrievalAgent(ModelProvider):
         bm25_indices = set()
         vector_indices = set()
 
-        # 1) BM25 & Vector Retrieval for each query
         for q in search_queries:
-            # BM25
             keywords = self._get_keywords(q)
             bm25_scores = self._score_bm25(chunks, keywords)
             bm25_top = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)[: self.top_k_bm25]
             bm25_indices.update([idx for idx, score in bm25_top if score > 0])
 
-            # Vector
             query_emb = cast(List[float], self._get_embeddings(q))
             if query_emb:
                 if len(chunks) <= 300:
@@ -288,7 +156,7 @@ class AdvancedRetrievalAgent(ModelProvider):
 
                 texts = [chunks[i]["text"] for i in candidate_for_vector]
                 doc_embs = cast(List[List[float]], self._get_embeddings_in_batches(texts, batch_size=64))
-                
+
                 q_vector_scores = []
                 for idx, emb in zip(candidate_for_vector, doc_embs):
                     if emb:
@@ -297,10 +165,7 @@ class AdvancedRetrievalAgent(ModelProvider):
                 q_vector_top = sorted(q_vector_scores, key=lambda x: x[1], reverse=True)[: self.top_k_vector]
                 vector_indices.update([idx for idx, sim in q_vector_top])
 
-        # 2) Merge & Deduplicate
-        merged_indices = list(bm25_indices | vector_indices)
-        # Limit candidates for Rerank to maintain performance
-        merged_indices = merged_indices[:60]
+        merged_indices = list(bm25_indices | vector_indices)[:60]
 
         rerank_inputs: List[str] = []
         chunk_map: Dict[str, int] = {}
@@ -322,16 +187,14 @@ class AdvancedRetrievalAgent(ModelProvider):
         if not rerank_inputs:
             return {"evidence_text": "No relevant content found."}
 
-        # 3) Rerank (Always use original question as the anchor)
         reranked_results = self._rerank_documents(question, rerank_inputs, top_n=self.rerank_top_n * 2)
 
         if not reranked_results:
             return {"evidence_text": "No relevant content found."}
 
-        # 4) Assemble Evidence (Dynamic Top-N + Context Enrichment)
         scores = [r.get("relevance_score", 0) for r in reranked_results]
         max_score = max(scores) if scores else 0
-        threshold = max_score * 0.15  # Lower threshold for multi-query to catch more potential needles
+        threshold = max_score * 0.15
 
         evidence_blocks: List[str] = []
         total_tokens = 0
@@ -405,43 +268,27 @@ class AdvancedRetrievalAgent(ModelProvider):
         if not keywords or not chunks:
             return {}
 
-        # 使用 rank_bm25 库进行优化
         tokenized_chunks = [self._tokenize(chunk["text"]) for chunk in chunks]
         bm25 = BM25Okapi(tokenized_chunks)
-        
-        # 针对每个关键词计算得分并累加
-        # 注意：rank_bm25 的 get_scores 是针对整个 query 的，这里我们需要手动组合
-        # 或者更简单地，直接将 keywords 作为一个 query 传入
-        # 但为了保留原来的权重逻辑（特定关键词加权），我们可能需要手动处理
-        
-        scores: Dict[int, float] = {}
-        # 初始化所有 chunks 的分数为 0
-        for i in range(len(chunks)):
-            scores[i] = 0.0
+
+        scores: Dict[int, float] = {i: 0.0 for i in range(len(chunks))}
 
         for kw in keywords:
             term = kw.lower()
             weight = 2.0 if ("-" in term or ":" in term or any(c.isdigit() for c in term)) else 1.0
-            
-            # 简单的分词，保持与 _tokenize 一致
+
             tokenized_query = self._tokenize(term)
             if not tokenized_query:
                 continue
-                
-            # 获取该关键词在所有文档中的得分
-            # BM25Okapi.get_scores 接受的是 token 列表作为 query
-            # 但这里我们想对每个 keyword 单独加权，所以分别计算
+
             kw_scores = bm25.get_scores(tokenized_query)
-            
             for i, score in enumerate(kw_scores):
                 if score > 0:
                     scores[i] += score * weight
-                    
+
         return scores
 
     def _tokenize(self, text: str) -> List[str]:
-        # 改进的分词：保留连字符、数字、字母
-        # 移除停用词逻辑可以放在这里或者调用处，BM25 通常不需要严格移除停用词，因为高频词 IDF 低
         return re.findall(r"[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*", text.lower())
 
     def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
@@ -457,57 +304,17 @@ class AdvancedRetrievalAgent(ModelProvider):
 
     def _get_keywords(self, question: str) -> List[str]:
         stop_words = {
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "of",
-            "with",
-            "by",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "being",
-            "have",
-            "has",
-            "had",
-            "do",
-            "does",
-            "did",
-            "will",
-            "would",
-            "could",
-            "should",
-            "may",
-            "might",
-            "can",
-            "what",
-            "when",
-            "where",
-            "why",
-            "how",
-            "who",
-            "which",
-            "that",
-            "this",
-            "these",
-            "those",
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+            "of", "with", "by", "is", "are", "was", "were", "be", "been", "being",
+            "have", "has", "had", "do", "does", "did", "will", "would", "could",
+            "should", "may", "might", "can", "what", "when", "where", "why", "how",
+            "who", "which", "that", "this", "these", "those",
         }
 
         q = question or ""
         keywords: List[str] = []
 
-        # 1) 强特征：带连字符的编码 / ID
+        # Hyphenated codes / IDs
         codes = re.findall(r"\b[A-Z0-9]+-[A-Z0-9-]+[A-Z0-9]\b", q)
         for c in codes:
             c_l = c.lower()
@@ -526,20 +333,20 @@ class AdvancedRetrievalAgent(ModelProvider):
             keywords.append(c_l)
             keywords.extend([p for p in c_l.split("-") if p])
 
-        # 1.1) JSON / Key-Value pairs: "key": "value" or key=value
+        # JSON / Key-Value pairs
         kv_pairs = re.findall(r'["\']?(\w+)["\']?\s*[:=]\s*["\']?([^"\'\s,{}]+)["\']?', q)
         for k, v in kv_pairs:
             keywords.append(k.lower())
             keywords.append(v.lower())
 
-        # 1.2) Special symbol combinations: [[...]], <<...>>, ((...))
+        # Special symbol combinations: [[...]], <<...>>, ((...))
         special_content = re.findall(r"[\[<{(]([^\[<{(]+)[\]>})]", q)
         for sc in special_content:
             sc_l = sc.lower()
             keywords.append(sc_l)
             keywords.extend([p for p in re.split(r"[\s\-_]+", sc_l) if len(p) > 2])
 
-        # 2) 数字 / 日期相关
+        # Numbers / dates
         keywords.extend(re.findall(r"\b\d+\b", q))
         keywords.extend(re.findall(r"\b20[0-9]{2}\b", q))
 
@@ -555,11 +362,10 @@ class AdvancedRetrievalAgent(ModelProvider):
         )
         keywords.extend(days)
 
-        # 3) 常规单词（过滤停用词）
+        # Content words (filtered)
         words = re.findall(r"\b[a-zA-Z]+\b", q.lower())
         keywords.extend([w for w in words if w not in stop_words and len(w) > 2])
 
-        # 控制数量，避免 BM25 被噪声拖累
         return list(dict.fromkeys(keywords))[:25]
 
     # -------------------------- External model calls -------------------------- #
@@ -600,4 +406,3 @@ class AdvancedRetrievalAgent(ModelProvider):
         except Exception as e:
             print(f"Error during reranking: {e}")
             return [{"document": d, "relevance_score": 0.0} for d in documents[:top_n]]
-

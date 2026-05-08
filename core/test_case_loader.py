@@ -59,20 +59,6 @@ def load_test_case(json_path: str) -> Dict:
     return test_cases[0]
 
 
-def is_multi_needle(test_case: Dict) -> bool:
-    """
-    根据 needle 字段判断是否为多 needle 用例。
-
-    Args:
-        test_case: 测试用例字典
-
-    Returns:
-        多 needle 返回 True，否则 False
-    """
-    needle = test_case['needle']
-    return isinstance(needle, list) and len(needle) > 1
-
-
 def get_needles(test_case: Dict) -> List[str]:
     """
     从测试用例中提取 needle。

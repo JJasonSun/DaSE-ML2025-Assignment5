@@ -1,5 +1,6 @@
 .env
 .env.*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,10 +17,17 @@ build/
 dist/
 *.egg-info/
 
-# Project files
+# Project outputs
 results/
 contexts/
 *.log
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.ipynb_checkpoints/
 
 # IDEs
 .vscode/
@@ -29,4 +37,6 @@ contexts/
 .DS_Store
 Thumbs.db
 
+.claude
+CLAUDE.md
 JD.md

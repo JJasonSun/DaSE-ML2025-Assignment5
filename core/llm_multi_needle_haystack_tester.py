@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import random
 import time
@@ -25,25 +24,9 @@ class LLMMultiNeedleHaystackTester:
                  haystack_dir: str = "PaulGrahamEssays",
                  question: str = None,
                  results_version: int = 1,
-                 save_results: bool = True,
                  save_contexts: bool = False,
                  print_ongoing_status: bool = True,
                  num_tests: int = 1):
-        """
-        初始化多文档测试框架。
-
-        Args:
-            model_to_test: 待测 Agent
-            evaluator: 评分器
-            needles: 需要插入的关键信息列表
-            haystack_dir: 文本文件所在目录
-            question: 针对 needles 的提问
-            results_version: 结果版本号
-            save_results: 是否保存测试结果
-            save_contexts: 是否保存生成的上下文
-            print_ongoing_status: 是否打印运行进度
-            num_tests: 运行次数（每次插入位置随机）
-        """
         if not model_to_test or not needles or not question:
             raise ValueError("model_to_test, needles, and question must be provided.")
 
@@ -53,7 +36,6 @@ class LLMMultiNeedleHaystackTester:
         self.haystack_dir = haystack_dir
         self.question = question
         self.results_version = results_version
-        self.save_results = save_results
         self.save_contexts = save_contexts
         self.print_ongoing_status = print_ongoing_status
         self.num_tests = num_tests
@@ -247,16 +229,6 @@ class LLMMultiNeedleHaystackTester:
             print(f"Score: {score}/10")
             print(f"Response: {response}\n")
 
-        # 保存结果
-        if self.save_results:
-            if not os.path.exists('results'):
-                os.makedirs('results')
-
-            result_file = f'results/{self.model_to_test.model_name}_test_{test_number}_results.json'
-            with open(result_file, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2)
-
-        # 保存上下文
         if self.save_contexts:
             if not os.path.exists('contexts'):
                 os.makedirs('contexts')

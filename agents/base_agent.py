@@ -1,82 +1,106 @@
-from abc import ABC, abstractmethod
+import asyncio
 import json
 import re
+from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
+
+import tiktoken
+from openai import OpenAI
 
 
 class ModelProvider(ABC):
-    """
-    Agent 实现的抽象基类。
-
-    继承本类以实现属于自己的大海捞针测试 Agent。
-    """
+    """Abstract base class for NIAH evaluation agents."""
 
     def __init__(self, api_key: str, base_url: str):
-        """
-        初始化模型提供者。
-
-        Args:
-            api_key: LLM 服务的 API Key
-            base_url: LLM 服务的基础地址
-        """
         self.api_key = api_key
         self.base_url = base_url
         self.model_name = "custom-agent"
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.tokenizer = tiktoken.encoding_for_model("gpt-4")
 
     @abstractmethod
     async def evaluate_model(self, prompt: Dict) -> str:
-        """
-        根据给定 prompt 调用模型。
-
-        需要在这里实现 Agent 的核心推理逻辑。
-
-        Args:
-            prompt: 包含上下文与问题等信息的字典
-
-        Returns:
-            模型返回的答案
-        """
         ...
 
-    @abstractmethod
     def generate_prompt(self, **kwargs) -> Dict:
-        """
-        生成传入模型的 prompt 结构。
+        return {"context_data": kwargs.get("context_data"), "question": kwargs.get("question")}
 
-        Args:
-            **kwargs: 依据测试场景传入的灵活参数
-
-        Returns:
-            包含 prompt 信息的字典
-        """
-        ...
-
-    @abstractmethod
     def encode_text_to_tokens(self, text: str) -> List[int]:
-        """
-        将文本编码为 tokens。
+        return self.tokenizer.encode(text or "")
 
-        Args:
-            text: 需要编码的文本
-
-        Returns:
-            token ID 列表
-        """
-        ...
-
-    @abstractmethod
     def decode_tokens(self, tokens: List[int], context_length: Optional[int] = None) -> str:
-        """
-        将 token ID 解码回文本。
+        if context_length is not None:
+            tokens = tokens[:context_length]
+        return self.tokenizer.decode(tokens)
 
-        Args:
-            tokens: token ID 列表
-            context_length: 可选，限定解码长度
+    # ---- Shared LLM call infrastructure ---- #
 
-        Returns:
-            解码后的文本
-        """
-        ...
+    async def _create_chat_completion(
+        self,
+        messages: List[Dict],
+        model: Optional[str] = None,
+        temperature: float = 0,
+        max_tokens: int = 800,
+        timeout: int = 60,
+        response_format: Optional[Dict] = None,
+        enable_thinking: bool = False,
+        thinking_budget_tokens: int = 1024,
+        top_p: float = 1.0,
+    ) -> str:
+        model_to_use = model or self.model_name
+        params: Dict = {
+            "model": model_to_use,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+            "top_p": top_p,
+        }
+        if response_format:
+            params["response_format"] = response_format
+
+        extra_body: Dict = {}
+        if enable_thinking:
+            extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
+        else:
+            extra_body["thinking"] = {"type": "disabled"}
+
+        if extra_body:
+            params["extra_body"] = extra_body
+
+        client_to_use = self.client
+
+        def _sync_call():
+            return client_to_use.chat.completions.create(**params)
+
+        try:
+            try:
+                completion = await asyncio.to_thread(_sync_call)
+            except AttributeError:
+                loop = asyncio.get_running_loop()
+                completion = await loop.run_in_executor(None, _sync_call)
+            raw = completion.to_dict()
+            return self._extract_content_from_response(raw)
+        except Exception as exc:
+            return f"API error: {exc}" if exc else "API error"
+
+    def _extract_content_from_response(self, result: dict) -> str:
+        try:
+            choice = result.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            content = message.get("content", "")
+            reasoning = message.get("reasoning_content", "")
+            finish_reason = choice.get("finish_reason", "unknown")
+
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+
+            if isinstance(reasoning, str) and reasoning.strip():
+                return reasoning.strip()
+
+            return f"Empty response (finish_reason: {finish_reason})"
+        except Exception as e:
+            return f"Response parsing error: {str(e)[:80]}"
 
     def compress_final_answer(self, response: str) -> str:
         """
@@ -97,6 +121,24 @@ class ModelProvider(ABC):
         text = self._strip_explanatory_suffix(text)
         text = self._normalize_answer(text)
         return text.strip()
+
+    def finalize_answer(self, response: str) -> str:
+        """
+        仅在输出看起来包含解释、格式化包装或多余内容时，才回退到答案压缩。
+
+        对于已经足够干净的单行最终答案，尽量保留原始表达，仅做轻量归一化。
+        """
+        if not isinstance(response, str):
+            response = "" if response is None else str(response)
+
+        text = response.strip()
+        if not text:
+            return ""
+
+        if self._looks_like_noisy_answer(text):
+            return self.compress_final_answer(text)
+
+        return self._normalize_answer(text).strip()
 
     def _strip_code_fences(self, text: str) -> str:
         match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
@@ -178,3 +220,21 @@ class ModelProvider(ABC):
         text = text.rstrip(".,;:!?！？。")
         text = re.sub(r"\s+", " ", text)
         return text
+
+    def _looks_like_noisy_answer(self, text: str) -> bool:
+        lowered = text.lower()
+        if "```" in text:
+            return True
+        if "\n" in text:
+            return True
+        if lowered.startswith("{") or lowered.startswith("["):
+            return True
+        if re.match(r"^(?:最终答案|答案|answer|final\s*answer|result)\s*[:：]", text, re.IGNORECASE):
+            return True
+        if re.match(r"^(?:the\s*)?answer\s*(?:is)?\s*[:：]", text, re.IGNORECASE):
+            return True
+        noisy_markers = (
+            " because ", " since ", " due to ", "analysis", "explanation", "reason",
+            "推理", "分析", "因为", "由于", "解释",
+        )
+        return any(marker in lowered for marker in noisy_markers)

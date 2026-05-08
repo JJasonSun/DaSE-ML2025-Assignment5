@@ -55,7 +55,6 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
             question=test_case['question'],
             results_version=args.results_version,
             num_tests=args.num_tests,
-            save_results=args.save_results,
             save_contexts=args.save_contexts,
             print_ongoing_status=args.print_ongoing_status
         )
@@ -76,7 +75,6 @@ def run_single_test_case(test_case: dict, agent_spec: str, api_key: str,
             document_depth_percent_min=args.document_depth_percent_min,
             document_depth_percent_max=args.document_depth_percent_max,
             document_depth_percent_intervals=args.document_depth_percent_intervals,
-            save_results=args.save_results,
             save_contexts=args.save_contexts,
             print_ongoing_status=args.print_ongoing_status
         )
