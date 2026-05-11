@@ -23,7 +23,11 @@ class ModelProvider(ABC):
         ...
 
     def generate_prompt(self, **kwargs) -> Dict:
-        return {"context_data": kwargs.get("context_data"), "question": kwargs.get("question")}
+        return {
+            "context": kwargs.get("context"),
+            "context_data": kwargs.get("context_data"),
+            "question": kwargs.get("question"),
+        }
 
     def encode_text_to_tokens(self, text: str) -> List[int]:
         return self.tokenizer.encode(text or "")
@@ -69,20 +73,25 @@ class ModelProvider(ABC):
             params["extra_body"] = extra_body
 
         client_to_use = self.client
+        max_retries = 3
 
         def _sync_call():
             return client_to_use.chat.completions.create(**params)
 
-        try:
+        for attempt in range(max_retries):
             try:
-                completion = await asyncio.to_thread(_sync_call)
-            except AttributeError:
-                loop = asyncio.get_running_loop()
-                completion = await loop.run_in_executor(None, _sync_call)
-            raw = completion.to_dict()
-            return self._extract_content_from_response(raw)
-        except Exception as exc:
-            return f"API error: {exc}" if exc else "API error"
+                try:
+                    completion = await asyncio.to_thread(_sync_call)
+                except AttributeError:
+                    loop = asyncio.get_running_loop()
+                    completion = await loop.run_in_executor(None, _sync_call)
+                raw = completion.to_dict()
+                return self._extract_content_from_response(raw)
+            except Exception as exc:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    return f"API error: {exc}" if exc else "API error"
 
     def _extract_content_from_response(self, result: dict) -> str:
         try:

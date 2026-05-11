@@ -41,6 +41,16 @@ def main():
         test_cases = sample_test_cases(test_cases, args.num_samples)
         print(f"\nSampled {len(test_cases)} test cases (balanced across types)")
 
+    # single 模式下只保留单 needle 用例
+    if args.test_mode == 'single':
+        before = len(test_cases)
+        test_cases = [tc for tc in test_cases if len(get_needles(tc)) == 1]
+        skipped = before - len(test_cases)
+        if skipped:
+            print(f"[single mode] Skipped {skipped} multi-needle case(s), {len(test_cases)} remaining")
+        if not test_cases:
+            raise ValueError("No single-needle test cases available. Try increasing --num_samples.")
+
     print("\n" + "=" * 80)
     print(f"Test cases: {len(test_cases)} (from {os.path.basename(test_case_json)})")
     print(f"Evaluator Type: {args.evaluator_type}")

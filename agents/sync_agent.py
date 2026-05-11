@@ -279,9 +279,3 @@ class SyncRetrievalAgent(ModelProvider):
             return text
         return self.decode_tokens(tokens[:max_tokens])
 
-    def generate_prompt(self, **kwargs) -> Dict:
-        return {
-            "context": kwargs.get("context"),
-            "context_data": kwargs.get("context_data"),
-            "question": kwargs.get("question"),
-        }

@@ -1,5 +1,7 @@
-﻿from openai import OpenAI
-from typing import Dict
+﻿import re
+import time
+from openai import OpenAI
+from typing import Dict, Optional
 from .evaluator import Evaluator
 from core.ecnu_constants import ECNU_PLUS_MODEL_NAME
 
@@ -21,29 +23,33 @@ Score 10: The answer is completely accurate and matches the ground truth.
         """Initialize the LLM evaluator."""
         self.ground_truth = ground_truth
         self.question = question
-        self.eval_api_key = api_key
-        self.eval_base_url = base_url
         self.eval_model_name = ECNU_PLUS_MODEL_NAME
+        self.eval_client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def _call_api(self, client: OpenAI, model: str, prompt: str) -> str:
-        """封装 API 调用逻辑。"""
-        if not model:
-            return None
-
+    def _call_api(self, prompt: str, max_retries: int = 3) -> Optional[str]:
+        """封装 API 调用逻辑，含重试。"""
         extra_body = {"thinking": {"type": "disabled"}}
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system",
-                 "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
-                {"role": "user", "content": prompt}
-            ],
-            extra_body=extra_body,
-        )
-        if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
-            return None
-        return completion.choices[0].message.content.strip()
+        for attempt in range(max_retries):
+            try:
+                completion = self.eval_client.chat.completions.create(
+                    model=self.eval_model_name,
+                    messages=[
+                        {"role": "system",
+                         "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    extra_body=extra_body,
+                )
+                if not completion or not getattr(completion, 'choices', None) or len(completion.choices) == 0:
+                    return None
+                return completion.choices[0].message.content.strip()
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    print(f"[Evaluator] API call failed after {max_retries} attempts: {e}")
+                    return None
 
     def evaluate_response(self, response: str) -> int:
         """Evaluate a response using LLM."""
@@ -58,18 +64,12 @@ Scoring Criteria:
 
 Please evaluate the answer and respond with ONLY a single number from 0 to 10. Do not include any explanation or other text."""
 
-        score_text = None
-
-        eval_client = OpenAI(api_key=self.eval_api_key, base_url=self.eval_base_url)
-        score_text = self._call_api(eval_client, self.eval_model_name, evaluation_prompt)
+        score_text = self._call_api(evaluation_prompt)
 
         if score_text is None:
             return 0
 
-        # 3. 解析分数
         try:
-            # 尝试提取第一个数字，以防模型返回了额外文字
-            import re
             nums = re.findall(r'\d+', score_text)
             if nums:
                 score = int(nums[0])

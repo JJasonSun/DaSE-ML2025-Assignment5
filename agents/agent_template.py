@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Dict, List, Optional
+from typing import Dict
 
 from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_MAIN_MODEL_NAME
 from .base_agent import ModelProvider
@@ -30,13 +30,8 @@ class ExampleAgent(ModelProvider):
             {"role": "user", "content": f"Context:\n{selected_content}\n\nQuestion: {question}\n\nAnswer:"},
         ]
 
-        completion = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            temperature=0,
-            max_tokens=300,
-        )
-        return self.finalize_answer(completion.choices[0].message.content)
+        response = await self._create_chat_completion(messages=messages)
+        return self.finalize_answer(response.strip())
 
     def _random_select_strategy(self, context_data: Dict) -> str:
         files = context_data["files"]

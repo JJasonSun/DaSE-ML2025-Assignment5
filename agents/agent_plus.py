@@ -1,4 +1,3 @@
-import json
 import math
 import os
 import re
@@ -77,18 +76,22 @@ class AdvancedRetrievalAgent(ModelProvider):
     # -------------------------- ModelProvider API -------------------------- #
     async def evaluate_model(self, prompt: Dict) -> str:
         context_data = prompt.get("context_data", {}) or {}
+        context_str = prompt.get("context", "") or ""
         question = prompt.get("question", "") or ""
         if not question:
             return "Missing required input data"
 
-        full_context = self._build_full_context(context_data)
-
-        total_context_tokens = int(full_context["total_tokens"])
-        if total_context_tokens <= self.full_context_threshold_tokens:
-            context_for_llm = full_context["text"]
+        # single 模式：直接使用 context 字符串
+        if not context_data and context_str:
+            context_for_llm = context_str
         else:
-            evidence = self._retrieve_with_hybrid(question, context_data)
-            context_for_llm = evidence["evidence_text"]
+            full_context = self._build_full_context(context_data)
+            total_context_tokens = int(full_context["total_tokens"])
+            if total_context_tokens <= self.full_context_threshold_tokens:
+                context_for_llm = full_context["text"]
+            else:
+                evidence = self._retrieve_with_hybrid(question, context_data)
+                context_for_llm = evidence["evidence_text"]
 
         system_prompt = self.prompts.get("system_prompt", "")
         user_template = self.prompts.get("user_prompt_template", "{context}\n\n{question}")

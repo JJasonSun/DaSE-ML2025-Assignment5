@@ -3,7 +3,7 @@ import re
 from typing import Dict, Optional
 
 from core.ecnu_constants import ECNU_PLUS_MODEL_NAME
-from agents.agent_plus import AdvancedRetrievalAgent
+from .agent_plus import AdvancedRetrievalAgent
 
 class ScenarioAwareAgent(AdvancedRetrievalAgent):
     """
