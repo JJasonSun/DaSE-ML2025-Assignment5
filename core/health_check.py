@@ -24,7 +24,6 @@ def check_models(api_key: str, base_url: str, evaluator_type: str):
     main_client.chat.completions.create(
         model=main_model_name,
         messages=[{"role": "user", "content": "hi"}],
-        max_tokens=5
     )
     print(f"  [OK] Main Model ({main_model_name})")
         
@@ -34,7 +33,6 @@ def check_models(api_key: str, base_url: str, evaluator_type: str):
         eval_client.chat.completions.create(
             model=ECNU_PLUS_MODEL_NAME,
             messages=[{"role": "user", "content": "hi"}],
-            max_tokens=5
         )
         print(f"  [OK] Evaluator Model ({ECNU_PLUS_MODEL_NAME})")
 

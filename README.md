@@ -111,13 +111,14 @@ depth_percent:   0% ────────────────────
 
 ## 📊 数据驱动的瓶颈与归因分析
 
-测试完成后自动生成可视化报表（输出到 `results/` 目录）：
+测试完成后自动生成 HTML 评测报告（输出到 `results/evaluation_report.html`）：
 
-| 图表                                  | 模式   | 说明                                                       |
-| :------------------------------------ | :----- | :--------------------------------------------------------- |
-| **热力图 (Heatmap)**            | single | context_length × depth_percent 交叉，扫描模型的"记忆黑洞" |
-| **得分分布 (Dashboard)**        | multi  | 柱状图（逐题得分）+ 饼图（Good/Partial/Fail 占比）         |
-| **Bad Case 归因 (Attribution)** | both   | 按问题类型拆解得分，定位薄弱维度（哪类问题模型最弱）       |
+| 模块                    | 模式   | 说明                                                              |
+| :---------------------- | :----- | :---------------------------------------------------------------- |
+| **HTML 热力图**   | single | 用表格色块展示 context_length × depth_percent 的得分             |
+| **得分分布看板**  | multi  | 用 HTML 条形图展示逐题得分与 Good/Partial/Fail 分布               |
+| **Bad Case 归因** | both   | 按问题类型拆解得分，定位薄弱维度（哪类问题模型最弱）              |
+| **AI 分析报告**   | both   | `deepseek-v4-pro` 开启 thinking，基于结构化指标生成产品评测解读 |
 
 ---
 
@@ -136,12 +137,18 @@ depth_percent:   0% ────────────────────
 │   ├── runner.py            #   测试执行引擎
 │   ├── test_case_loader.py  #   测试用例加载与均衡抽样
 │   ├── health_check.py      #   API 连通性预检
-│   └── visualize.py         #   可视化出图
+│   ├── evaluation_data.py   #   生成最近一次结构化评测数据
+│   ├── reporter_factory.py  #   报告插件动态加载
+│   └── report.py            #   兼容默认 HTML 报告入口
+├── reporters/               # 报告生成插件
+│   ├── base_reporter.py
+│   └── deepseek_html_reporter.py
 ├── evaluators/              # 评分引擎
 │   ├── evaluator.py         #   Evaluator 基类
 │   ├── llm_evaluator.py     #   LLM-as-a-Judge (0-10 语义评分)
 │   └── string_match_evaluator.py  #   精确匹配 (0/1)
 ├── test_cases/              # 测试题库
+├── generate_report.py       # 基于本地结构化数据单独重生成 HTML 报告
 ├── run.py                   # 统一命令行入口
 └── requirements.txt
 ```
@@ -168,16 +175,21 @@ ModelProvider (base_agent.py)
 ECNU_API_KEY=sk-xxxx
 ECNU_BASE_URL=https://chat.ecnu.edu.cn/open/api/v1
 MODEL_NAME=ecnu-max       # 主测模型，可改为 ecnu-plus
+
+DS_API_KEY=sk-xxxx        # HTML 报告里的 AI 数据分析模型
+DS_BASE_URL=https://api.deepseek.com
+DS_MODEL_NAME=deepseek-v4-pro
 ```
 
-平台使用 ECNU 提供的模型服务，所有模型均在校内部署：
+平台评测链路使用 ECNU 提供的模型服务，HTML 报告的数据分析文本使用 DeepSeek API：
 
-| 模型 | 用途 | 底层模型 | 上下文 |
-|:---|:---|:---|:---|
-| `ecnu-max` | 主测模型（可通过 `MODEL_NAME` 切换） | DeepSeek-V4-Flash | 1M |
-| `ecnu-plus` | 评分器 / 场景分类 / Helper | Qwen3.6-27B | 256K |
-| `ecnu-embedding-small` | Dense 向量检索（1024 维） | bge-m3 | 8K |
-| `ecnu-rerank` | Rerank 精排 | bge-reranker-v2-m3 | 8K |
+| 模型                     | 用途                                   | 底层模型           | 上下文 |
+| :----------------------- | :------------------------------------- | :----------------- | :----- |
+| `ecnu-max`             | 主测模型（可通过 `MODEL_NAME` 切换） | DeepSeek-V4-Flash  | 1M     |
+| `ecnu-plus`            | 评分器 / 场景分类 / Helper             | Qwen3.6-27B        | 256K   |
+| `ecnu-embedding-small` | Dense 向量检索（1024 维）              | bge-m3             | 8K     |
+| `ecnu-rerank`          | Rerank 精排                            | bge-reranker-v2-m3 | 8K     |
+| `deepseek-v4-pro`      | HTML 报告的 AI 产品评测分析            | DeepSeek V4 Pro    | 1M     |
 
 安装依赖：
 
@@ -205,22 +217,31 @@ uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --num_samples 
 
 # 开启思考模式（Extended Thinking），提升复杂推理准确率
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --enable_thinking True
+
+# 关闭 HTML 评测报告生成
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --generate_report False
+
+# 基于最近一次结构化数据单独重生成 HTML 报告
+uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
 ```
 
 ### 3. 参数说明
 
-| 参数                  | 默认值                                | 说明                                                   |
-| :-------------------- | :------------------------------------ | :----------------------------------------------------- |
-| `--agent`           | *(必填)*                            | Agent 路径，格式 `module.path:ClassName`             |
-| `--test_case_json`  | `test_cases/test_cases_all_en.json` | 测试题库 JSON 路径                                     |
-| `--num_samples`     | `20`                                | 从题库中按类型均衡抽样的用例数                         |
-| `--test_mode`       | `multi`                             | 测试模式：`multi`（多文档）或 `single`（网格扫描） |
-| `--evaluator_type`  | `llm`                               | 评分器：`llm`（语义评分）或 `string`（精确匹配）   |
-| `--num_tests`       | `3`                                 | multi 模式下每个用例的重复试验次数                     |
+| 参数                  | 默认值                                | 说明                                                          |
+| :-------------------- | :------------------------------------ | :------------------------------------------------------------ |
+| `--agent`           | *(必填)*                            | Agent 路径，格式 `module.path:ClassName`                    |
+| `--test_case_json`  | `test_cases/test_cases_all_en.json` | 测试题库 JSON 路径                                            |
+| `--num_samples`     | `20`                                | 从题库中按类型均衡抽样的用例数                                |
+| `--test_mode`       | `multi`                             | 测试模式：`multi`（多文档）或 `single`（网格扫描）        |
+| `--evaluator_type`  | `llm`                               | 评分器：`llm`（语义评分）或 `string`（精确匹配）          |
+| `--num_tests`       | `3`                                 | multi 模式下每个用例的重复试验次数                            |
 | `--enable_thinking` | `False`                             | 开启模型思考模式（Extended Thinking），提升推理质量但增加延迟 |
-| `--skip_model_test` | `False`                             | 跳过 API 健康检查（调试时使用）                        |
-| `--haystack_dir`    | `PaulGrahamEssays`                  | 干扰库文本文件目录                                     |
-| `--visualize`       | `True`                              | 测试完成后自动生成可视化                               |
+| `--skip_model_test` | `False`                             | 跳过 API 健康检查（调试时使用）                               |
+| `--haystack_dir`    | `PaulGrahamEssays`                  | 干扰库文本文件目录                                            |
+| `--generate_report` | `True`                              | 测试完成后自动生成 HTML 评测报告                              |
+| `--reporter`        | `reporters.deepseek_html_reporter:DeepSeekHtmlReporter` | 报告生成插件路径，格式同 Agent 插件                            |
+| `--report_data_path` | `results/latest_evaluation_data.json` | 最近一次结构化评测数据，运行时覆盖旧文件，只保留一份              |
+| `--report_output_path` | `results/evaluation_report.html` | HTML 报告输出路径                                             |
 
 ---
 

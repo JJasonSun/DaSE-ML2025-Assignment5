@@ -43,29 +43,20 @@ class ModelProvider(ABC):
         self,
         messages: List[Dict],
         model: Optional[str] = None,
-        temperature: float = 0,
-        max_tokens: int = 800,
-        timeout: int = 60,
         response_format: Optional[Dict] = None,
         enable_thinking: bool = False,
-        thinking_budget_tokens: int = 1024,
-        top_p: float = 1.0,
     ) -> str:
         model_to_use = model or self.model_name
         params: Dict = {
             "model": model_to_use,
             "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "timeout": timeout,
-            "top_p": top_p,
         }
         if response_format:
             params["response_format"] = response_format
 
         extra_body: Dict = {}
         if enable_thinking:
-            extra_body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget_tokens}
+            extra_body["thinking"] = {"type": "enabled"}
         else:
             extra_body["thinking"] = {"type": "disabled"}
 

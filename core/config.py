@@ -1,40 +1,43 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class CommandArgs:
-    """命令行参数配置"""
-    agent: str  # Agent 指定，格式为 "module.path:ClassName"，例如：agents.agent_template:ExampleAgent
+    """命令行参数配置。"""
 
-    api_key: Optional[str] = None  # 可选：覆盖环境变量中的 API_KEY（命令行优先）
-    base_url: Optional[str] = None  # 可选：覆盖环境变量中的 BASE_URL（命令行优先）
+    agent: str  # Agent 路径，格式为 "module.path:ClassName"
 
-    test_case_json: Optional[str] = None  # 测试用例 JSON 路径（默认使用 test_cases/test_cases_all_en.json）
-    num_samples: Optional[int] = 20  # 从测试题库中随机抽取的用例数（按类型均衡抽样）
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
 
-    test_mode: Optional[str] = "multi"  # 测试模式：'multi'（多文档，多 needle）或 'single'（单文档，单 needle）
-    evaluator_type: Optional[str] = "llm"  # 评估器类型：'string'（精确字符串匹配）或 'llm'（LLM 语义评分）
-    haystack_dir: Optional[str] = "PaulGrahamEssays"  # 存放 haystack 文本文件的目录（用于插入 needles）
-    results_version: Optional[int] = 1  # 结果保存的版本号，用于区分不同实验批次
+    test_case_json: Optional[str] = None  # 默认使用 test_cases/test_cases_all_en.json
+    num_samples: Optional[int] = 20  # 按类型均衡抽样的用例总数
 
-    # 多文档（multi）模式相关参数：
-    num_tests: Optional[int] = 3  # 每个测试用例执行的随机试验次数（每次 needle 插入位置不同）
+    test_mode: Optional[str] = "multi"  # multi 或 single
+    evaluator_type: Optional[str] = "llm"  # llm 或 string
+    haystack_dir: Optional[str] = "PaulGrahamEssays"
+    results_version: Optional[int] = 1
 
-    # 单文档（single）模式下用于扫描不同上下文长度的参数（以 token 计）：
-    context_lengths_min: Optional[int] = 1000  # 最小上下文长度（token）
-    context_lengths_max: Optional[int] = 100000  # 最大上下文长度（token）
-    context_lengths_num_intervals: Optional[int] = 10  # 在 min 与 max 之间划分多少个区间用于测试
+    # multi 模式参数
+    num_tests: Optional[int] = 3
 
-    # 针对 needle 在文档中插入深度（百分比）的扫描范围与划分：
-    document_depth_percent_min: Optional[int] = 0  # 插入深度最小值（0 = 文档开头）
-    document_depth_percent_max: Optional[int] = 100  # 插入深度最大值（100 = 文档末尾）
-    document_depth_percent_intervals: Optional[int] = 10  # 深度划分区间数
+    # single 模式参数
+    context_lengths_min: Optional[int] = 1000
+    context_lengths_max: Optional[int] = 100000
+    context_lengths_num_intervals: Optional[int] = 10
+    document_depth_percent_min: Optional[int] = 0
+    document_depth_percent_max: Optional[int] = 100
+    document_depth_percent_intervals: Optional[int] = 10
 
-    # 模型行为：
-    enable_thinking: Optional[bool] = False  # 是否开启模型思考模式（Extended Thinking）
+    # 模型行为
+    enable_thinking: Optional[bool] = False
 
-    # 输出控制：
-    save_contexts: Optional[bool] = False  # 是否把生成的上下文文件写入 contexts/ 以便复查
-    print_ongoing_status: Optional[bool] = True  # 是否在控制台打印详细的进行状态（便于监控与调试）
-    skip_model_test: Optional[bool] = False  # 是否跳过运行前的模型健康检查
-    visualize: Optional[bool] = True  # 测试完成后是否自动生成可视化图表
+    # 输出控制
+    save_contexts: Optional[bool] = False
+    print_ongoing_status: Optional[bool] = True
+    skip_model_test: Optional[bool] = False
+    generate_report: Optional[bool] = True
+    reporter: Optional[str] = "reporters.deepseek_html_reporter:DeepSeekHtmlReporter"
+    report_data_path: Optional[str] = "results/latest_evaluation_data.json"
+    report_output_path: Optional[str] = "results/evaluation_report.html"

@@ -43,6 +43,7 @@ class AdvancedRetrievalAgent(ModelProvider):
 
         self.full_context_threshold_tokens = 64000
         self.max_evidence_tokens = 32000
+        self.max_ecnu_retrieval_chars = 8192
 
         self.prompts = self._load_prompts()
 
@@ -178,7 +179,7 @@ class AdvancedRetrievalAgent(ModelProvider):
                 f"[Doc {chunk['doc_id']} | File {chunk['filename']} | Chunk {chunk['chunk_id']} | "
                 f"Offset {chunk['token_start']}-{chunk['token_end']}]"
             )
-            text_to_rerank = f"{header}\n{chunk['text']}"
+            text_to_rerank = self._trim_retrieval_text(f"{header}\n{chunk['text']}")
             rerank_inputs.append(text_to_rerank)
             chunk_map[text_to_rerank] = idx
 
@@ -370,9 +371,12 @@ class AdvancedRetrievalAgent(ModelProvider):
     def _get_embeddings(self, input_data: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
         try:
             if isinstance(input_data, str):
-                response = self.client.embeddings.create(model=self.embedding_model, input=input_data)
+                response = self.client.embeddings.create(model=self.embedding_model, input=self._trim_retrieval_text(input_data))
                 return response.data[0].embedding
-            resp = self.client.embeddings.create(model=self.embedding_model, input=input_data)
+            resp = self.client.embeddings.create(
+                model=self.embedding_model,
+                input=[self._trim_retrieval_text(text) for text in input_data],
+            )
             sorted_data = sorted(resp.data, key=lambda x: x.index)
             return [item.embedding for item in sorted_data]
         except Exception as e:
@@ -395,7 +399,13 @@ class AdvancedRetrievalAgent(ModelProvider):
             return []
         url = f"{self.base_url}/rerank"
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {"model": self.rerank_model, "query": query, "documents": documents, "top_n": top_n, "return_documents": True}
+        payload = {
+            "model": self.rerank_model,
+            "query": query,
+            "documents": documents,
+            "top_n": top_n,
+            "return_documents": True,
+        }
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
@@ -404,3 +414,9 @@ class AdvancedRetrievalAgent(ModelProvider):
         except Exception as e:
             print(f"Error during reranking: {e}")
             return [{"document": d, "relevance_score": 0.0} for d in documents[:top_n]]
+
+    def _trim_retrieval_text(self, text: str) -> str:
+        text = text or ""
+        if len(text) <= self.max_ecnu_retrieval_chars:
+            return text
+        return text[: self.max_ecnu_retrieval_chars]
