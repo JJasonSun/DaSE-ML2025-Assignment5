@@ -37,8 +37,7 @@ def main():
     if args.evaluator_type not in ["string", "llm"]:
         raise ValueError(f"evaluator_type must be 'string' or 'llm', got: {args.evaluator_type}")
 
-    if not args.skip_model_test:
-        check_models(api_key, base_url, args.evaluator_type)
+    check_models(api_key, base_url, args.evaluator_type)
 
     default_test_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_cases", "test_cases_all_en.json")
     test_case_json = args.test_case_json or default_test_file

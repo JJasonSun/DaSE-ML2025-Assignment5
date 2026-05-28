@@ -1,5 +1,6 @@
 import html
 import os
+import re
 import time
 from typing import Any, Dict, List
 
@@ -171,6 +172,7 @@ class DeepSeekHtmlReporter(BaseReporter):
 
     def _render_html(self, data: Dict, metrics: Dict[str, Any], analysis: str) -> str:
         mode_section = self._render_single_section(metrics) if metrics.get("test_mode") == "single" else self._render_multi_section(metrics)
+        analysis_html = _markdown_to_html(analysis)
         return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -179,80 +181,150 @@ class DeepSeekHtmlReporter(BaseReporter):
   <title>{LABEL["title"]}</title>
   <style>
     :root {{
-      --ink: #18212f;
-      --muted: #6c7687;
-      --paper: #f4f0e8;
-      --panel: rgba(255,255,255,.86);
-      --line: #ded7cc;
-      --good: #1f8f5f;
-      --partial: #b97916;
-      --fail: #c3423f;
-      --navy: #14213d;
-      --cyan: #0c8b95;
-      --gold: #e5a93f;
+      --bg: #071018;
+      --bg-2: #0d1723;
+      --panel: rgba(13, 24, 36, .84);
+      --panel-strong: rgba(18, 31, 46, .96);
+      --ink: #e8f1f8;
+      --muted: #8ea1b5;
+      --line: rgba(123, 184, 210, .18);
+      --line-strong: rgba(127, 211, 255, .38);
+      --good: #35d18d;
+      --partial: #f5b84b;
+      --fail: #ff5f6d;
+      --cyan: #42d6ff;
+      --blue: #6c8cff;
+      --violet: #9c7cff;
+      --chip: rgba(66, 214, 255, .11);
+      --shadow: 0 22px 70px rgba(0, 0, 0, .34);
     }}
     * {{ box-sizing: border-box; }}
+    html {{ scroll-behavior: smooth; }}
     body {{
       margin: 0;
       color: var(--ink);
       background:
-        linear-gradient(135deg, rgba(20,33,61,.08) 0 25%, transparent 25% 50%, rgba(229,169,63,.12) 50% 75%, transparent 75%) 0 0/36px 36px,
-        radial-gradient(circle at 12% 8%, rgba(12,139,149,.18), transparent 32%),
-        radial-gradient(circle at 88% 18%, rgba(229,169,63,.22), transparent 30%),
-        var(--paper);
-      font-family: Georgia, "Times New Roman", "Microsoft YaHei", serif;
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0/42px 42px,
+        linear-gradient(0deg, rgba(255,255,255,.03) 1px, transparent 1px) 0 0/42px 42px,
+        radial-gradient(circle at 18% 8%, rgba(66, 214, 255, .22), transparent 34%),
+        radial-gradient(circle at 86% 12%, rgba(156, 124, 255, .18), transparent 30%),
+        linear-gradient(145deg, var(--bg), var(--bg-2) 48%, #050b11);
+      font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
       line-height: 1.58;
+      min-height: 100vh;
     }}
-    main {{ max-width: 1240px; margin: 0 auto; padding: 34px 22px 62px; }}
+    body::before {{
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 18%, rgba(0,0,0,.24));
+      mix-blend-mode: screen;
+    }}
+    main {{ max-width: 1280px; margin: 0 auto; padding: 36px 22px 70px; position: relative; }}
     header {{
       position: relative;
       display: grid;
       grid-template-columns: 1.4fr .6fr;
       gap: 24px;
       align-items: end;
-      padding: 30px 0 24px;
-      border-bottom: 3px double var(--navy);
-      margin-bottom: 22px;
+      padding: 36px 0 30px;
+      margin-bottom: 18px;
     }}
-    .eyebrow {{ color: var(--cyan); font: 700 12px/1.2 "Consolas", monospace; letter-spacing: .12em; text-transform: uppercase; }}
-    h1 {{ margin: 8px 0 8px; font-size: 44px; line-height: 1.02; letter-spacing: 0; }}
-    h2 {{ margin: 0 0 14px; font-size: 20px; }}
-    .stamp {{ justify-self: end; border: 2px solid var(--navy); padding: 14px 16px; background: rgba(255,255,255,.56); box-shadow: 8px 8px 0 rgba(20,33,61,.11); }}
-    .stamp strong {{ display: block; font-size: 28px; }}
+    header::after {{
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
+      box-shadow: 0 0 26px rgba(66, 214, 255, .45);
+    }}
+    .eyebrow {{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--cyan);
+      font: 800 12px/1.2 "Cascadia Mono", "Consolas", monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }}
+    .eyebrow::before {{ content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--good); box-shadow: 0 0 16px var(--good); }}
+    h1 {{ margin: 10px 0 10px; font-size: clamp(34px, 5vw, 62px); line-height: .98; letter-spacing: 0; font-weight: 850; }}
+    h2 {{ margin: 0 0 16px; font-size: 18px; letter-spacing: .02em; }}
+    .stamp {{
+      justify-self: end;
+      min-width: 220px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 17px 18px;
+      background: linear-gradient(180deg, rgba(66,214,255,.13), rgba(10,20,31,.78));
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.08);
+    }}
+    .stamp strong {{ display: block; font-size: 42px; line-height: 1; margin: 7px 0; color: #fff; text-shadow: 0 0 24px rgba(66,214,255,.42); }}
     .muted {{ color: var(--muted); }}
     section {{
-      background: var(--panel);
+      position: relative;
+      background: linear-gradient(180deg, var(--panel), rgba(8, 17, 27, .88));
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 18px;
-      box-shadow: 0 18px 45px rgba(42, 34, 22, .08);
-      backdrop-filter: blur(10px);
+      border-radius: 10px;
+      padding: 22px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      overflow: hidden;
+    }}
+    section::before {{
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--cyan), transparent 38%, var(--violet));
+      opacity: .72;
     }}
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }}
     .card {{
-      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.68));
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
       border: 1px solid var(--line);
-      border-left: 4px solid var(--cyan);
-      border-radius: 7px;
+      border-radius: 8px;
       padding: 15px;
       min-height: 96px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
     }}
-    .metric-label {{ color: var(--muted); font: 700 12px/1.2 "Consolas", monospace; text-transform: uppercase; }}
-    .metric-value {{ font-size: 25px; font-weight: 700; margin-top: 8px; overflow-wrap: anywhere; }}
-    table {{ width: 100%; border-collapse: collapse; background: rgba(255,255,255,.52); }}
-    th, td {{ border-bottom: 1px solid var(--line); padding: 11px 9px; text-align: left; vertical-align: top; }}
-    th {{ color: var(--muted); font: 700 12px/1.2 "Consolas", monospace; text-transform: uppercase; }}
-    tr:hover td {{ background: rgba(12,139,149,.06); }}
-    .bar-row {{ display: grid; grid-template-columns: 150px 1fr 56px; align-items: center; gap: 10px; margin: 10px 0; }}
-    .bar-label {{ color: var(--muted); font: 700 12px/1.2 "Consolas", monospace; }}
-    .bar-track {{ height: 18px; background: #e8e0d3; border: 1px solid rgba(20,33,61,.08); border-radius: 3px; overflow: hidden; }}
-    .bar-fill {{ height: 100%; border-radius: 2px; }}
-    .score-pill {{ text-align: right; font-weight: 800; }}
-    .analysis {{ white-space: pre-wrap; font-size: 16px; }}
+    .card:hover {{ border-color: var(--line-strong); transform: translateY(-1px); transition: .18s ease; }}
+    .metric-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; text-transform: uppercase; letter-spacing: .08em; }}
+    .metric-value {{ font-size: 25px; font-weight: 780; margin-top: 9px; overflow-wrap: anywhere; color: #f7fbff; }}
+    table {{ width: 100%; border-collapse: separate; border-spacing: 0; background: rgba(2,8,14,.22); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }}
+    th, td {{ border-bottom: 1px solid var(--line); padding: 12px 10px; text-align: left; vertical-align: top; }}
+    tr:last-child td {{ border-bottom: 0; }}
+    th {{ color: #b7c7d8; font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; text-transform: uppercase; letter-spacing: .08em; background: rgba(66,214,255,.06); }}
+    td {{ color: #d8e4ee; }}
+    tr:hover td {{ background: rgba(66,214,255,.055); }}
+    .bar-row {{ display: grid; grid-template-columns: minmax(132px, 210px) 1fr 56px; align-items: center; gap: 12px; margin: 11px 0; }}
+    .bar-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; overflow-wrap: anywhere; }}
+    .bar-track {{ height: 18px; background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 16px rgba(0,0,0,.28); }}
+    .bar-fill {{ height: 100%; border-radius: 999px; box-shadow: 0 0 18px currentColor; }}
+    .score-pill {{ text-align: right; font-weight: 850; color: #fff; font-variant-numeric: tabular-nums; }}
+    .analysis {{
+      display: grid;
+      gap: 14px;
+      font-size: 15px;
+      color: #dbe8f3;
+    }}
+    .analysis h3 {{
+      margin: 4px 0 2px;
+      color: #ffffff;
+      font-size: 18px;
+      letter-spacing: .01em;
+    }}
+    .analysis p {{ margin: 0; color: #cfdae5; }}
+    .analysis ul {{ margin: 0; padding-left: 20px; display: grid; gap: 7px; }}
+    .analysis li::marker {{ color: var(--cyan); }}
+    .analysis strong {{ color: #fff; font-weight: 850; }}
     .heatmap-wrap {{ overflow-x: auto; }}
     .heatmap td, .heatmap th {{ text-align: center; white-space: nowrap; }}
-    .heat-cell {{ font-weight: 800; border-radius: 4px; color: #102033; border: 1px solid rgba(20,33,61,.1); }}
+    .heat-cell {{ font-weight: 850; border-radius: 6px; color: #081018; border: 1px solid rgba(255,255,255,.28); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }}
     @media (max-width: 880px) {{
       header {{ grid-template-columns: 1fr; }}
       .stamp {{ justify-self: start; }}
@@ -283,7 +355,7 @@ class DeepSeekHtmlReporter(BaseReporter):
   {self._render_bad_cases(metrics)}
   <section>
     <h2>{LABEL["analysis_title"]}</h2>
-    <div class="analysis">{_e(analysis)}</div>
+    <div class="analysis">{analysis_html}</div>
   </section>
 </main>
 </body>
@@ -440,11 +512,66 @@ def _score_color(score: float) -> str:
 def _heat_color(score: float) -> str:
     score = max(0.0, min(10.0, float(score)))
     if score < 4:
-        return "#f3b0a7"
+        return "#ff7c86"
     if score < 8:
-        return "#f0d68b"
-    return "#95d3ae"
+        return "#f7c75b"
+    return "#55d99d"
 
 
 def _e(value: Any) -> str:
     return html.escape("" if value is None else str(value))
+
+
+def _markdown_to_html(text: str) -> str:
+    """Render a small, safe subset of Markdown used by report analysis output."""
+    if not text:
+        return "<p></p>"
+
+    blocks: List[str] = []
+    list_items: List[str] = []
+    paragraphs: List[str] = []
+
+    def flush_list() -> None:
+        nonlocal list_items
+        if list_items:
+            blocks.append("<ul>" + "".join(f"<li>{item}</li>" for item in list_items) + "</ul>")
+            list_items = []
+
+    def flush_paragraph() -> None:
+        nonlocal paragraphs
+        if paragraphs:
+            blocks.append("<p>" + "<br>".join(paragraphs) + "</p>")
+            paragraphs = []
+
+    for raw_line in str(text).replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            flush_list()
+            continue
+
+        heading = re.match(r"^#{1,4}\s+(.+)$", line)
+        if heading:
+            flush_paragraph()
+            flush_list()
+            blocks.append(f"<h3>{_inline_markdown(heading.group(1))}</h3>")
+            continue
+
+        bullet = re.match(r"^(?:[-*]\s+|\d+[.)]\s+)(.+)$", line)
+        if bullet:
+            flush_paragraph()
+            list_items.append(_inline_markdown(bullet.group(1)))
+            continue
+
+        paragraphs.append(_inline_markdown(line))
+
+    flush_paragraph()
+    flush_list()
+    return "".join(blocks) if blocks else "<p></p>"
+
+
+def _inline_markdown(text: str) -> str:
+    escaped = _e(text)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"`([^`]+)`", r"<strong>\1</strong>", escaped)
+    return escaped

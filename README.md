@@ -199,30 +199,69 @@ uv pip install -r requirements.txt
 
 ### 2. 运行评测
 
+默认会从 `test_cases/test_cases_all_en.json` 中按类型均衡抽样测试用例，使用 `multi` 模式运行，并在结束后自动生成：
+
+- `results/latest_evaluation_data.json`：最近一次结构化评测数据，只保留一份
+- `results/evaluation_report.html`：HTML 评测报告
+
+所有评测都会先执行 API 健康检查，确认主测模型、评测模型、Embedding 和 Rerank 服务可用。
+
+#### 快速冒烟测试
+
+用于确认环境、API Key、Agent 加载、评测流程和报告生成是否正常。它和正式评测使用同一套 `multi` 流程，只是样本量更小、每条用例只重复 1 次。
+
 ```bash
-# 推荐：multi 模式 + AdvancedRetrievalAgent（默认抽样 20 条，每条跑 3 次）
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 5 --num_tests 1
+```
+
+#### 推荐：默认正式评测
+
+默认抽样 20 条测试用例，每条用例重复 3 次。
+
+```bash
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent
+```
 
-# 场景感知路由 Agent
-uv run python run.py --agent agents.scenario_agent:ScenarioAwareAgent
+#### 扩大样本量
 
-# 抽样 50 条测试用例
+```bash
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 50
+```
 
-# single 模式：扫描上下文长度 × 深度的热力图
-uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --test_mode single
+#### 使用场景感知 Agent
 
-# 快速冒烟测试（跳过健康检查，5 条用例，精确匹配）
-uv run python run.py --agent agents.sync_agent:SyncRetrievalAgent --num_samples 5 --test_mode single --evaluator_type string --num_tests 1 --skip_model_test True
+```bash
+uv run python run.py --agent agents.scenario_agent:ScenarioAwareAgent
+```
 
-# 开启思考模式（Extended Thinking），提升复杂推理准确率
+#### single 模式：上下文长度 × 插入深度扫描
+
+`single` 模式用于观察模型在不同上下文长度和 needle 插入深度下的退化区间。它会生成网格化测试，通常比默认 `multi` 模式更耗时。
+
+```bash
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --test_mode single
+```
+
+#### 开启思考模式
+
+默认关闭。只在需要提升复杂推理质量时开启，因为会增加延迟和调用成本。
+
+```bash
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --enable_thinking True
+```
 
-# 关闭 HTML 评测报告生成
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --generate_report False
+#### 只重生成 HTML 报告
 
-# 基于最近一次结构化数据单独重生成 HTML 报告
+不重新跑评测，直接使用最近一次结构化数据生成报告。
+
+```bash
 uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
+```
+
+#### 关闭报告生成
+
+```bash
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --generate_report False
 ```
 
 ### 3. 参数说明
@@ -236,7 +275,6 @@ uv run python generate_report.py --input results/latest_evaluation_data.json --o
 | `--evaluator_type`  | `llm`                               | 评分器：`llm`（语义评分）或 `string`（精确匹配）          |
 | `--num_tests`       | `3`                                 | multi 模式下每个用例的重复试验次数                            |
 | `--enable_thinking` | `False`                             | 开启模型思考模式（Extended Thinking），提升推理质量但增加延迟 |
-| `--skip_model_test` | `False`                             | 跳过 API 健康检查（调试时使用）                               |
 | `--haystack_dir`    | `PaulGrahamEssays`                  | 干扰库文本文件目录                                            |
 | `--generate_report` | `True`                              | 测试完成后自动生成 HTML 评测报告                              |
 | `--reporter`        | `reporters.deepseek_html_reporter:DeepSeekHtmlReporter` | 报告生成插件路径，格式同 Agent 插件                            |

@@ -15,6 +15,9 @@ uv pip install -r requirements.txt
 # Run evaluation (default: 20 cases sampled from all_en, multi-needle, LLM judge)
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent
 
+# Smoke test (same multi-mode flow, 5 cases, 1 run each, generates report)
+uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 5 --num_tests 1
+
 # Sample more cases
 uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 50
 
@@ -26,9 +29,6 @@ uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --enable_t
 
 # Regenerate HTML report from latest local structured data
 uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
-
-# Skip health check for faster iteration
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --skip_model_test True
 
 ```
 

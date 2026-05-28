@@ -36,7 +36,6 @@ class CommandArgs:
     # 输出控制
     save_contexts: Optional[bool] = False
     print_ongoing_status: Optional[bool] = True
-    skip_model_test: Optional[bool] = False
     generate_report: Optional[bool] = True
     reporter: Optional[str] = "reporters.deepseek_html_reporter:DeepSeekHtmlReporter"
     report_data_path: Optional[str] = "results/latest_evaluation_data.json"
