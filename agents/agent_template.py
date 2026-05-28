@@ -26,8 +26,8 @@ class ExampleAgent(ModelProvider):
         selected_content = self._random_select_strategy(context_data)
 
         messages = [
-            {"role": "system", "content": "You are a helpful AI assistant. Answer the question based on the provided context."},
-            {"role": "user", "content": f"Context:\n{selected_content}\n\nQuestion: {question}\n\nAnswer:"},
+            {"role": "system", "content": "你是一个有帮助的 AI 助手。请基于给定上下文回答问题。"},
+            {"role": "user", "content": f"上下文：\n{selected_content}\n\n问题：{question}\n\n答案："},
         ]
 
         response = await self._create_chat_completion(messages=messages)

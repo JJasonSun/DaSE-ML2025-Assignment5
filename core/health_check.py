@@ -23,7 +23,7 @@ def check_models(api_key: str, base_url: str, evaluator_type: str):
     main_client = OpenAI(api_key=api_key, base_url=base_url)
     main_client.chat.completions.create(
         model=main_model_name,
-        messages=[{"role": "user", "content": "hi"}],
+        messages=[{"role": "user", "content": "你好"}],
     )
     print(f"  [OK] Main Model ({main_model_name})")
         
@@ -32,7 +32,7 @@ def check_models(api_key: str, base_url: str, evaluator_type: str):
         eval_client = OpenAI(api_key=ecnu_api_key, base_url=ecnu_base_url)
         eval_client.chat.completions.create(
             model=ECNU_PLUS_MODEL_NAME,
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[{"role": "user", "content": "你好"}],
         )
         print(f"  [OK] Evaluator Model ({ECNU_PLUS_MODEL_NAME})")
 

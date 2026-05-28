@@ -19,94 +19,88 @@ class ScenarioAwareAgent(AdvancedRetrievalAgent):
 
     def _get_scenario_prompts(self) -> Dict[str, Dict[str, str]]:
         base_system = (
-            "You are a rigorous retrieval and reasoning expert specializing in {expertise_title}, "
-            "operating in a Needle-in-a-Haystack scenario: locate precise evidence in a long context "
-            "and derive the correct answer.\n\n"
-            "## Protocol\n"
-            "1) Decompose: Identify all question elements, constraints, and conditions that must be satisfied.\n"
-            "2) Locate evidence: Scan the context for keywords, codes, numbers, dates, and other clues. "
-            "Information may be scattered or partially obscured.\n"
-            "3) Reason deeply: {reasoning_instruction} Perform precise logical deduction and arithmetic "
-            "as needed. Ensure accuracy. Do NOT output your reasoning process.\n"
-            "4) Cross-verify: Validate the candidate answer against known constraints. Eliminate contradictions.\n"
-            "5) Output: Return ONLY the final answer. No explanation, no steps, no restating evidence.\n"
-            "6) Fallback: If after exhaustive search and computation no answer is found, return \"Unknown\".\n\n"
-            "## Strict Rules\n"
-            "- Rely ONLY on the provided context and general reasoning/arithmetic. No external knowledge.\n"
-            "- Infer before giving up — especially for date→weekday and number→arithmetic conversions. "
-            "Do not abandon a question just because the answer is not explicitly stated."
+            "你是专注于{expertise_title}的严谨检索与推理专家，正在处理 Needle-in-a-Haystack 长上下文任务："
+            "你需要从长上下文中定位精确证据，并推导出正确答案。\n\n"
+            "## 协议\n"
+            "1. 拆解问题：识别题目中的所有元素、约束条件和必须满足的要求。\n"
+            "2. 定位证据：在上下文中检索关键词、编号、数字、日期和其它线索。"
+            "信息可能分散、隐藏或只在局部出现。\n"
+            "3. 深度推理：{reasoning_instruction} 必要时进行精确逻辑推导和算术计算，"
+            "并保证结果准确。不要输出推理过程。\n"
+            "4. 交叉验证：用已知约束校验候选答案，排除矛盾结果。\n"
+            "5. 输出：只返回最终答案。不要解释，不要列步骤，不要复述证据。\n"
+            "6. 兜底：如果充分检索和计算后仍找不到答案，返回 \"Unknown\"。\n\n"
+            "## 严格规则\n"
+            "- 只能依赖给定上下文和必要的通用推理/算术，不要使用外部知识。\n"
+            "- 在放弃前必须先尝试推断，尤其是日期到星期、数字到算术结果这类转换。"
+            "不要因为答案没有被直接写出就立即放弃。"
         )
 
         user_template = (
-            "Context:\n{context}\n\nQuestion: {question}\n\n"
-            "Output only the final answer. No explanation."
+            "上下文：\n{context}\n\n问题：{question}\n\n"
+            "请只输出最终答案，不要解释。"
         )
 
         return {
             "encoding": {
                 "system": base_system.format(
-                    expertise_title="data encoding and cryptography",
+                    expertise_title="数据编码与密码学",
                     reasoning_instruction=(
-                        "Identify the encoding scheme (Base64, Hex, Caesar cipher, etc.), "
-                        "apply the correct decoding method step-by-step, and verify the result "
-                        "is consistent with the surrounding context."
+                        "识别编码方案（如 Base64、Hex、Caesar cipher 等），"
+                        "在内部应用正确的解码方法，并核对解码结果是否与上下文一致。"
                     )
                 ),
-                "user": user_template
+                "user": user_template,
             },
             "string_analysis": {
                 "system": base_system.format(
-                    expertise_title="precise string and character analysis",
+                    expertise_title="精确字符串与字符分析",
                     reasoning_instruction=(
-                        "Perform character-level or word-level analysis with strict precision. "
-                        "Count occurrences, determine positions, and extract substrings exactly — "
-                        "no approximation."
+                        "进行严格的字符级或词级分析，精确统计出现次数、判断位置并抽取子串，"
+                        "不要近似估算。"
                     )
                 ),
-                "user": user_template
+                "user": user_template,
             },
             "computation": {
                 "system": base_system.format(
-                    expertise_title="mathematical reasoning and calculation",
+                    expertise_title="数学推理与计算",
                     reasoning_instruction=(
-                        "Extract all relevant numerical values, identify the required operations "
-                        "(addition, subtraction, multiplication, division, etc.), and carry out "
-                        "precise arithmetic. Handle units and ratios carefully."
+                        "抽取所有相关数值，识别所需运算（加、减、乘、除等），"
+                        "并完成精确计算，注意单位、比例和整数除法语义。"
                     )
                 ),
-                "user": user_template
+                "user": user_template,
             },
             "date_time": {
                 "system": base_system.format(
-                    expertise_title="temporal reasoning and calendar analysis",
+                    expertise_title="时间推理与日历分析",
                     reasoning_instruction=(
-                        "Extract all dates and times. Compute weekdays, durations, and deadlines "
-                        "through logical derivation. When only a date is given and the weekday is needed, "
-                        "you MUST perform the calculation — do not skip it. Account for month lengths "
-                        "and leap years."
+                        "抽取所有日期和时间，计算星期、时长和截止时间。"
+                        "如果题目给出日期但要求星期，必须在内部完成计算，不要跳过。"
+                        "需要考虑月份天数和闰年。"
                     )
                 ),
-                "user": user_template
-            }
+                "user": user_template,
+            },
         }
 
     async def _classify_scenario(self, question: str) -> Optional[str]:
         classification_prompt = (
-            "Classify the following question into exactly one scenario category. "
-            "Return a JSON object with \"category\" and \"confidence\" (0-100%).\n\n"
-            "Categories:\n"
-            "1. encoding — Decoding Base64, Hex, ciphers, or other encoded strings.\n"
-            "2. string_analysis — Character/word counting, position finding, or substring extraction.\n"
-            "3. computation — Multi-step arithmetic, large-number calculation, or mathematical operations.\n"
-            "4. date_time — Date, weekday, duration, or deadline calculation.\n\n"
-            "If the question does not clearly fit any category, set \"category\" to \"none\".\n\n"
-            f"Question: {question}\n\n"
-            "JSON:"
+            "请将下面的问题严格分类到一个场景类别中。"
+            "只返回 JSON 对象，包含 \"category\" 和 \"confidence\"（0-100%）。\n\n"
+            "类别：\n"
+            "1. encoding：Base64、Hex、移位密码或其它编码字符串的解码。\n"
+            "2. string_analysis：字符/单词计数、位置查找或子串抽取。\n"
+            "3. computation：多步算术、大数计算或数学运算。\n"
+            "4. date_time：日期、星期、时长或截止时间计算。\n\n"
+            "如果问题无法明确归入任何类别，请将 \"category\" 设为 \"none\"。\n\n"
+            f"问题：{question}\n\n"
+            "JSON："
         )
         
         messages = [{"role": "user", "content": classification_prompt}]
         
-        # 使用 ECNU-plus 进行分类
         response = await self._create_chat_completion(
             messages=messages,
             model=ECNU_PLUS_MODEL_NAME,

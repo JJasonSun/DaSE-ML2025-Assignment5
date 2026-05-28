@@ -215,9 +215,9 @@ class ModelProvider(ABC):
 
     def _normalize_answer(self, text: str) -> str:
         text = text.strip()
-        text = re.sub(r"^(?:[\-\*•]+\s*|\d+[\.\)]\s+)", "", text)
-        text = text.strip("\"'“”‘’`")
-        text = text.rstrip(".,;:!?！？。")
+        text = re.sub(r"^(?:[\-\*•\+\s]*|\d+[\.\)]\s+)", "", text)
+        text = text.strip("\"'“”‘’")
+        text = text.rstrip(".,;:!?，。！？")
         text = re.sub(r"\s+", " ", text)
         return text
 

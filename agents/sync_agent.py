@@ -61,25 +61,24 @@ class SyncRetrievalAgent(ModelProvider):
                 {
                     "role": "system",
                     "content": (
-                        "You are a strict answer extractor. Return ONLY the final answer — no explanation, "
-                        "no restating the question, no prefixes, no suffixes, no numbering, no bullet points, "
-                        "no quotes, no code blocks, no extra punctuation.\n"
-                        "1. If the question involves date calculation or weekday derivation, compute it from "
-                        "the dates provided in the context.\n"
-                        "2. Output dates/weekdays in English format (e.g., Thursday, December 25, 2031).\n"
-                        "3. For numeric answers, output Arabic numerals directly.\n"
-                        "4. If the answer is a word, phrase, or number, output only that content.\n"
-                        "5. If the answer cannot be determined, output: Unknown\n"
-                        "6. The final answer must be in English."
+                        "你是严格的答案抽取器。只返回最终答案：不要解释，不要复述问题，"
+                        "不要添加前缀或后缀，不要编号，不要项目符号，不要引号，"
+                        "不要代码块，不要额外标点。\n"
+                        "1. 如果问题涉及日期计算或星期推导，请根据上下文中的日期完成计算。\n"
+                        "2. 日期和星期答案请使用英文格式，例如 Thursday, December 25, 2031。\n"
+                        "3. 数值答案请直接输出阿拉伯数字。\n"
+                        "4. 如果答案是单词、短语或数字，只输出该内容本身。\n"
+                        "5. 如果无法确定答案，只输出：Unknown\n"
+                        "6. 最终答案必须使用英文。"
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        f"Answer the question based ONLY on the context below. Output only the answer, no explanation.\n\n"
-                        f"Context:\n{selected_content}\n\n"
-                        f"Question: {question}\n\n"
-                        f"Answer:"
+                        f"请只基于下面的上下文回答问题。只输出答案，不要解释。\n\n"
+                        f"上下文：\n{selected_content}\n\n"
+                        f"问题：{question}\n\n"
+                        f"答案："
                     ),
                 },
             ]

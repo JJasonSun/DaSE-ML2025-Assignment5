@@ -11,11 +11,11 @@ class LLMEvaluator(Evaluator):
 
     CRITERIA: Dict[str, str] = {
         "accuracy": """
-Score 0: The answer is completely wrong or unrelated.
-Score 3: The answer has minor relevance but contains major inaccuracies.
-Score 5: The answer is partially correct but missing key information.
-Score 7: The answer is mostly correct with minor omissions.
-Score 10: The answer is completely accurate and matches the ground truth.
+0 分：答案完全错误或与问题无关。
+3 分：答案有少量相关性，但包含重大错误。
+5 分：答案部分正确，但缺少关键信息。
+7 分：答案基本正确，但有轻微遗漏。
+10 分：答案完全准确，并与标准答案匹配。
 """
     }
 
@@ -36,7 +36,7 @@ Score 10: The answer is completely accurate and matches the ground truth.
                     model=self.eval_model_name,
                     messages=[
                         {"role": "system",
-                         "content": "You are an expert evaluator. Respond only with a number from 0 to 10."},
+                         "content": "你是专业评测员。请只返回 0 到 10 之间的一个数字。"},
                         {"role": "user", "content": prompt}
                     ],
                     extra_body=extra_body,
@@ -53,16 +53,16 @@ Score 10: The answer is completely accurate and matches the ground truth.
 
     def evaluate_response(self, response: str) -> int:
         """Evaluate a response using LLM."""
-        evaluation_prompt = f"""You are an expert evaluator. Your task is to score the answer based on how well it matches the ground truth.
+        evaluation_prompt = f"""你是专业评测员。你的任务是根据模型答案与标准答案的匹配程度进行评分。
 
-Question: {self.question}
-Ground Truth Answer: {self.ground_truth}
-Answer: {response}
+问题：{self.question}
+标准答案：{self.ground_truth}
+模型答案：{response}
 
-Scoring Criteria:
+评分标准：
 {self.CRITERIA['accuracy']}
 
-Please evaluate the answer and respond with ONLY a single number from 0 to 10. Do not include any explanation or other text."""
+请评估模型答案，并且只返回 0 到 10 之间的一个数字。不要包含任何解释或其它文本。"""
 
         score_text = self._call_api(evaluation_prompt)
 

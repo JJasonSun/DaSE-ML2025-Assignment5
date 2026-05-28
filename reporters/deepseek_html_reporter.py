@@ -76,27 +76,33 @@ class DeepSeekHtmlReporter(BaseReporter):
             return LABEL["missing_key"]
 
         client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        mode = str(metrics.get("test_mode", data.get("config", {}).get("test_mode", "unknown"))).lower()
+        mode_focus = self._analysis_focus_for_mode(mode)
         system = (
-            "You are a rigorous AI product evaluation analyst. "
-            "Analyze only the provided structured metrics and bad cases. "
-            "Do not invent missing data. Write in Chinese for an AI product manager."
+            "你是严谨的 AI 产品评测分析师。"
+            "你只能基于给定的结构化指标和 Bad Case 进行分析。"
+            "不要编造缺失数据。请面向 AI 产品经理写作。"
         )
         user = f"""
-Generate the textual analysis section for an HTML evaluation dashboard.
+请为 HTML 评测数据看板生成“文字分析”部分。
 
-Required sections:
-1. Overall conclusion
-2. Main capability gaps
-3. Bad Case attribution
-4. Actionable optimization suggestions
+必须包含以下部分：
+1. 总体结论
+2. 主要能力短板
+3. Bad Case 归因
+4. 可执行优化建议
 
-Constraints:
-- Write in Chinese.
-- Do not output full HTML.
-- You may use short headings and bullet points.
-- Do not invent model comparisons, user behavior, business outcomes, or unprovided causes.
+约束：
+- 使用中文。
+- 不要输出完整 HTML。
+- 可以使用短标题和项目符号。
+- 不要编造模型对比、用户行为、业务结果或未提供的原因。
+- 必须遵循下面的模式专属分析重点。
 
-Structured evaluation data:
+模式专属分析重点：
+{mode_focus}
+
+结构化评测数据：
 {{
   "config": {data.get("config", {})},
   "metrics": {metrics},
@@ -112,6 +118,28 @@ Structured evaluation data:
             )
         except Exception as exc:
             return f"{LABEL['ai_failed']}{exc}"
+
+    def _analysis_focus_for_mode(self, mode: str) -> str:
+        if mode == "single":
+            return (
+                "- 这是单文档、单 needle 的长上下文扫描。\n"
+                "- 优先分析模型对上下文长度和插入深度的敏感性。\n"
+                "- 识别 context_length × depth_percent 网格中的低分区间。\n"
+                "- 判断失败是否更像长上下文退化、中间位置遗忘，或定位到 needle 后的答案抽取失败。\n"
+                "- 优化建议需要落到提示词设计、检索兜底、上下文窗口策略和评测设置。"
+            )
+        if mode == "multi":
+            return (
+                "- 这是多文档、多 needle 的检索与推理评测。\n"
+                "- 优先分析跨文档检索、多 needle 聚合和证据组合能力。\n"
+                "- 判断失败是否更可能来自漏掉某个 needle、召回无关 chunk、检索后的算术/日期/字符串推理错误，或答案格式漂移。\n"
+                "- needle 深度统计只能作为辅助证据；没有数据支持时，不要过度归因于深度。\n"
+                "- 优化建议需要落到混合检索、rerank 阈值、邻近 chunk 补充和场景化推理 prompt。"
+            )
+        return (
+            "- 当前测试模式未知。请保持保守，只分析显式指标和 Bad Case。\n"
+            "- 除非数据明确支持，否则不要推断模式专属原因。"
+        )
 
     def _chat_with_retry(
         self,
