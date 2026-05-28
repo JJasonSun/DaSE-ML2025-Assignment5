@@ -77,6 +77,7 @@ def build_metrics(results: List[dict], summaries: List[dict], args: Any, report_
         },
         "by_type": by_type,
         "bad_examples": _extract_bad_examples(results, limit=12),
+        "tool_diagnostics": _tool_diagnostics(results),
     }
 
     if test_mode == "single":
@@ -161,6 +162,18 @@ def _per_run_scores(results: List[dict]) -> List[Dict[str, Any]]:
             }
         )
     return rows
+
+
+def _tool_diagnostics(results: List[dict]) -> Dict[str, Any]:
+    traces = [r.get("agent_trace", {}) for r in results if isinstance(r.get("agent_trace"), dict)]
+    path_counts = Counter(str(t.get("path", "unknown")) for t in traces)
+    fallback_counts = Counter(str(t.get("fallback_reason")) for t in traces if t.get("fallback_reason"))
+    task_counts = Counter(str(t.get("task_type", "unknown")) for t in traces)
+    return {
+        "path_counts": dict(path_counts),
+        "fallback_counts": dict(fallback_counts),
+        "task_counts": dict(task_counts),
+    }
 
 
 def _truncate(text: str, max_len: int) -> str:

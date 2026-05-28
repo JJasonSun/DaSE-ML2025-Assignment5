@@ -216,6 +216,7 @@ class LLMMultiNeedleHaystackTester:
             'total_files': len(self.txt_files),
             'files_with_needles': len(context_data['files']),
             'model_response': response,
+            'agent_trace': getattr(self.model_to_test, 'last_trace', {}),
             'score': score,
             'test_duration_seconds': test_elapsed_time,
             'test_timestamp_utc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S%z')

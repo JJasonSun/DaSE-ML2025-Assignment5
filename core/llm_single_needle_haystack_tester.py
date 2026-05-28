@@ -145,6 +145,7 @@ class LLMSingleNeedleHaystackTester:
             'version': self.results_version,
             'needle': self.needle,
             'model_response': response,
+            'agent_trace': getattr(self.model_to_test, 'last_trace', {}),
             'score': score,
             'test_duration_seconds': test_elapsed_time,
             'test_timestamp_utc': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S%z')

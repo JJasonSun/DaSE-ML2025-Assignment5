@@ -12,44 +12,41 @@ DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_REPORT_MODEL_NAME = "deepseek-v4-pro"
 
 
-def _u(text: str) -> str:
-    return text.encode("ascii").decode("unicode_escape")
-
 
 LABEL = {
-    "title": _u(r"LLM \u80fd\u529b\u8bc4\u6d4b\u62a5\u544a"),
-    "subtitle": _u(r"\u7ed3\u6784\u5316\u6570\u636e\u770b\u677f\u4e0e AI \u4ea7\u54c1\u5206\u6790"),
-    "generated_at": _u(r"\u751f\u6210\u65f6\u95f4"),
-    "analysis_title": _u(r"AI \u4ea7\u54c1\u8bc4\u6d4b\u5206\u6790"),
-    "analysis_model": _u(r"\u5206\u6790\u6a21\u578b"),
-    "model": _u(r"\u4e3b\u6d4b\u6a21\u578b"),
-    "test_mode": _u(r"\u6d4b\u8bd5\u6a21\u5f0f"),
-    "total_runs": _u(r"\u8fd0\u884c\u6b21\u6570"),
-    "mean_score": _u(r"\u5e73\u5747\u5206"),
-    "evaluator": _u(r"\u8bc4\u5206\u5668"),
-    "cases": _u(r"\u7528\u4f8b\u6570"),
-    "thinking": _u(r"\u601d\u8003\u6a21\u5f0f"),
-    "enabled": _u(r"\u5f00\u542f"),
-    "disabled": _u(r"\u5173\u95ed"),
-    "overview": _u(r"\u6838\u5fc3\u6307\u6807"),
-    "overall": _u(r"\u5f97\u5206\u5206\u5e03"),
-    "max_score": _u(r"\u6700\u9ad8\u5206"),
-    "min_score": _u(r"\u6700\u4f4e\u5206"),
-    "type_perf": _u(r"\u5206\u7c7b\u578b\u8868\u73b0"),
-    "type": _u(r"\u7c7b\u578b"),
-    "sample_count": _u(r"\u6837\u672c\u6570"),
-    "good_count": _u(r"Good \u6570"),
-    "bad_count": _u(r"Bad Case \u6570"),
-    "multi_detail": _u(r"Multi \u6a21\u5f0f\u9010\u6b21\u8868\u73b0"),
-    "needle_depth": _u(r"Needle \u6df1\u5ea6"),
-    "single_heatmap": _u(r"Single \u6a21\u5f0f\u70ed\u529b\u56fe"),
-    "bad_examples": _u(r"\u4f4e\u5206\u6837\u4f8b"),
-    "score": _u(r"\u5206\u6570"),
-    "question": _u(r"\u95ee\u9898"),
-    "ground_truth": _u(r"\u6807\u51c6\u7b54\u6848"),
-    "response": _u(r"\u6a21\u578b\u56de\u7b54"),
-    "ai_failed": _u(r"AI \u5206\u6790\u751f\u6210\u5931\u8d25\uff1a"),
-    "missing_key": _u(r"\u7f3a\u5c11 DS_API_KEY\uff0c\u5df2\u8df3\u8fc7 AI \u6587\u672c\u5206\u6790\u3002"),
+    "title": 'LLM 能力评测报告',
+    "subtitle": '结构化数据看板与 AI 产品分析',
+    "generated_at": '生成时间',
+    "analysis_title": 'AI 产品评测分析',
+    "analysis_model": '分析模型',
+    "model": '主测模型',
+    "test_mode": '测试模式',
+    "total_runs": '运行次数',
+    "mean_score": '平均分',
+    "evaluator": '评分器',
+    "cases": '用例数',
+    "thinking": '思考模式',
+    "enabled": '开启',
+    "disabled": '关闭',
+    "overview": '核心指标',
+    "overall": '得分分布',
+    "max_score": '最高分',
+    "min_score": '最低分',
+    "type_perf": '分类型表现',
+    "type": '类型',
+    "sample_count": '样本数',
+    "good_count": 'Good 数',
+    "bad_count": 'Bad Case 数',
+    "multi_detail": 'Multi 模式逐次表现',
+    "needle_depth": 'Needle 深度',
+    "single_heatmap": 'Single 模式热力图',
+    "bad_examples": '低分样例',
+    "score": '分数',
+    "question": '问题',
+    "ground_truth": '标准答案',
+    "response": '模型回答',
+    "ai_failed": 'AI 分析生成失败：',
+    "missing_key": '缺少 DS_API_KEY，已跳过 AI 文本分析。',
 }
 
 
@@ -80,30 +77,32 @@ class DeepSeekHtmlReporter(BaseReporter):
         mode = str(metrics.get("test_mode", data.get("config", {}).get("test_mode", "unknown"))).lower()
         mode_focus = self._analysis_focus_for_mode(mode)
         system = (
-            "你是严谨的 AI 产品评测分析师。"
-            "你只能基于给定的结构化指标和 Bad Case 进行分析。"
-            "不要编造缺失数据。请面向 AI 产品经理写作。"
+            '你是严谨的 AI 产品评测分析师，只负责撰写报告中的文字解读。'
+            + '禁止输出 HTML、XML、CSS、JavaScript、代码块或完整网页结构。'
+            + '只能输出普通 Markdown 文本：短标题、短段落和项目符号。'
+            + '所有结论必须基于给定的结构化指标、Bad Case 和工具链诊断，不要编造缺失数据。'
         )
         user = f"""
-请为 HTML 评测数据看板生成“文字分析”部分。
+{'请为评测数据看板生成“AI 产品评测分析”文字，不要生成 HTML。'}
 
-必须包含以下部分：
-1. 总体结论
-2. 主要能力短板
-3. Bad Case 归因
-4. 可执行优化建议
+{'必须包含以下四个部分：'}
+## {'总体结论'}
+## {'主要能力短板'}
+## Bad Case {'归因'}
+## {'可执行优化建议'}
 
-约束：
-- 使用中文。
-- 不要输出完整 HTML。
-- 可以使用短标题和项目符号。
-- 不要编造模型对比、用户行为、业务结果或未提供的原因。
-- 必须遵循下面的模式专属分析重点。
+{'输出约束：'}
+- {'只能使用 Markdown 文本。'}
+- {'禁止输出任何 HTML 标签，例如 <html>、<body>、<section>、<div>、<table>。'}
+- {'禁止输出 ```html 或其它代码块。'}
+- {'不要写“下面是 HTML 代码”之类的话。'}
+- {'不要编造模型对比、用户行为、业务结果或未提供的原因。'}
+- {'必须结合工具链诊断，说明失败更可能发生在检索、结构化抽取、工具执行、回退路径还是答案格式。'}
 
-模式专属分析重点：
+{'模式专属分析重点：'}
 {mode_focus}
 
-结构化评测数据：
+{'结构化评测数据：'}
 {{
   "config": {data.get("config", {})},
   "metrics": {metrics},
@@ -123,23 +122,23 @@ class DeepSeekHtmlReporter(BaseReporter):
     def _analysis_focus_for_mode(self, mode: str) -> str:
         if mode == "single":
             return (
-                "- 这是单文档、单 needle 的长上下文扫描。\n"
-                "- 优先分析模型对上下文长度和插入深度的敏感性。\n"
-                "- 识别 context_length × depth_percent 网格中的低分区间。\n"
-                "- 判断失败是否更像长上下文退化、中间位置遗忘，或定位到 needle 后的答案抽取失败。\n"
-                "- 优化建议需要落到提示词设计、检索兜底、上下文窗口策略和评测设置。"
+                '- 这是单文档、单 needle 的长上下文扫描。\n'
+                + '- 优先分析模型对上下文长度和插入深度的敏感区间。\n'
+                + '- 识别 context_length x depth_percent 网格中的低分区域。\n'
+                + '- 判断失败是否更像长上下文退化、中间位置遗忘，或定位到 needle 后的答案抽取失败。\n'
+                + '- 优化建议需要落到提示词设计、检索兜底、上下文窗口策略和评测设置。'
             )
         if mode == "multi":
             return (
-                "- 这是多文档、多 needle 的检索与推理评测。\n"
-                "- 优先分析跨文档检索、多 needle 聚合和证据组合能力。\n"
-                "- 判断失败是否更可能来自漏掉某个 needle、召回无关 chunk、检索后的算术/日期/字符串推理错误，或答案格式漂移。\n"
-                "- needle 深度统计只能作为辅助证据；没有数据支持时，不要过度归因于深度。\n"
-                "- 优化建议需要落到混合检索、rerank 阈值、邻近 chunk 补充和场景化推理 prompt。"
+                '- 这是多文档、多 needle 的检索与推理评测。\n'
+                + '- 优先分析跨文档检索、多 needle 聚合和证据组合能力。\n'
+                + '- 判断失败是否更可能来自漏掉某个 needle、召回无关 chunk、检索后的算术/日期/字符串推理错误，或答案格式漂移。\n'
+                + '- needle 深度统计只能作为辅助证据；没有数据支持时，不要过度归因于深度。\n'
+                + '- 优化建议需要落到混合检索、rerank 阈值、邻近 chunk 补充、工具增强和场景化推理。'
             )
         return (
-            "- 当前测试模式未知。请保持保守，只分析显式指标和 Bad Case。\n"
-            "- 除非数据明确支持，否则不要推断模式专属原因。"
+            '- 当前测试模式未知。请保持保守，只分析显式指标和 Bad Case。\n'
+            + '- 除非数据明确支持，否则不要推断模式专属原因。'
         )
 
     def _chat_with_retry(
@@ -172,7 +171,7 @@ class DeepSeekHtmlReporter(BaseReporter):
 
     def _render_html(self, data: Dict, metrics: Dict[str, Any], analysis: str) -> str:
         mode_section = self._render_single_section(metrics) if metrics.get("test_mode") == "single" else self._render_multi_section(metrics)
-        analysis_html = _markdown_to_html(analysis)
+        analysis_html = _markdown_to_html(_sanitize_ai_analysis(analysis))
         return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -351,6 +350,7 @@ class DeepSeekHtmlReporter(BaseReporter):
   {self._render_overview(metrics)}
   {self._render_outcomes(metrics)}
   {self._render_type_table(metrics)}
+  {self._render_tool_diagnostics(metrics)}
   {mode_section}
   {self._render_bad_cases(metrics)}
   <section>
@@ -422,6 +422,36 @@ class DeepSeekHtmlReporter(BaseReporter):
   <table>
     <thead><tr><th>{LABEL["type"]}</th><th>{LABEL["sample_count"]}</th><th>{LABEL["mean_score"]}</th><th>{LABEL["good_count"]}</th><th>{LABEL["bad_count"]}</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
+  </table>
+</section>
+"""
+
+    def _render_tool_diagnostics(self, metrics: Dict[str, Any]) -> str:
+        diagnostics = metrics.get("tool_diagnostics", {}) or {}
+        path_counts = diagnostics.get("path_counts", {}) or {}
+        fallback_counts = diagnostics.get("fallback_counts", {}) or {}
+        task_counts = diagnostics.get("task_counts", {}) or {}
+        if not path_counts and not fallback_counts and not task_counts:
+            return ""
+
+        def rows(data: Dict[str, Any], label: str) -> str:
+            if not data:
+                return f"<tr><td>{label}</td><td>-</td><td>0</td></tr>"
+            return "".join(
+                f"<tr><td>{label}</td><td>{_e(key)}</td><td>{_e(value)}</td></tr>"
+                for key, value in sorted(data.items())
+            )
+
+        return f"""
+<section>
+  <h2>工具链诊断</h2>
+  <table>
+    <thead><tr><th>维度</th><th>标签</th><th>次数</th></tr></thead>
+    <tbody>
+      {rows(path_counts, "执行路径")}
+      {rows(task_counts, "任务类型")}
+      {rows(fallback_counts, "回退原因")}
+    </tbody>
   </table>
 </section>
 """
@@ -568,6 +598,32 @@ def _markdown_to_html(text: str) -> str:
     flush_paragraph()
     flush_list()
     return "".join(blocks) if blocks else "<p></p>"
+
+
+def _sanitize_ai_analysis(text: str) -> str:
+    if not text:
+        return ""
+
+    clean = str(text).strip()
+    code_block = re.fullmatch(r"```(?:html|xml|markdown|md)?\s*(.*?)\s*```", clean, re.DOTALL | re.IGNORECASE)
+    if code_block:
+        clean = code_block.group(1).strip()
+
+    clean = re.sub(r"```(?:html|xml|markdown|md)?", "", clean, flags=re.IGNORECASE)
+    clean = clean.replace("```", "")
+    clean = re.sub(r"(?is)<script.*?>.*?</script>", "", clean)
+    clean = re.sub(r"(?is)<style.*?>.*?</style>", "", clean)
+
+    # If the model ignored instructions and produced HTML, keep the text content
+    # rather than rendering source code or trusting model-generated markup.
+    if re.search(r"(?is)</?(html|body|section|div|table|tr|td|th|p|h[1-6]|ul|li)\b", clean):
+        clean = re.sub(r"(?i)<br\s*/?>", "\n", clean)
+        clean = re.sub(r"(?i)</(p|div|section|h[1-6]|li|tr)>", "\n", clean)
+        clean = re.sub(r"(?is)<[^>]+>", "", clean)
+        clean = html.unescape(clean)
+
+    clean = re.sub(r"(?i)^\s*(here is|below is).{0,80}(html|code).*$", "", clean, flags=re.MULTILINE)
+    return clean.strip()
 
 
 def _inline_markdown(text: str) -> str:

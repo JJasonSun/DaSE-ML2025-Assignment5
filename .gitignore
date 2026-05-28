@@ -38,5 +38,5 @@ htmlcov/
 Thumbs.db
 
 .claude
-CLAUDE.md
-JD.md
+
+docs/

@@ -1,10 +1,16 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
+
+## Constraints & Tone
+
+1. 语言：始终使用中文。
+2. 态度：保持客观与真实。如果用户前提有误，直接指出。
+3. 工具：遇到不懂的概念或时效性信息，必须使用联网搜索。
 
 ## Project Overview
 
-LLM Needle-in-a-Haystack (NIAH) evaluation framework — an automated, pluggable platform for testing LLM long-context retrieval and complex reasoning. Built as an ECNU Machine Learning course assignment.
+LLM Needle-in-a-Haystack evaluation framework for long-context retrieval, multi-document evidence aggregation, exact reasoning, automated scoring, structured result capture, and HTML report generation.
 
 ## Common Commands
 
@@ -12,67 +18,65 @@ LLM Needle-in-a-Haystack (NIAH) evaluation framework — an automated, pluggable
 # Install dependencies
 uv pip install -r requirements.txt
 
-# Run evaluation (default: 20 cases sampled from all_en, multi-needle, LLM judge)
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent
+# Recommended evaluation: tool-augmented agent, 20 balanced samples, multi mode, LLM judge
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent
 
-# Smoke test (same multi-mode flow, 5 cases, 1 run each, generates report)
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 5 --num_tests 1
+# Smoke test: same multi-mode flow, 5 cases, 1 run each
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --num_samples 5 --num_tests 1
 
-# Sample more cases
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --num_samples 50
+# Larger sample
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --num_samples 50
 
-# Single-needle grid search (context_length x depth)
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --test_mode single
+# Hybrid retrieval baseline for ablation
+uv run python run.py --agent agents.hybrid_retrieval_agent:HybridRetrievalAgent
 
-# Enable extended thinking for better reasoning
-uv run python run.py --agent agents.agent_plus:AdvancedRetrievalAgent --enable_thinking True
+# Single-needle grid search
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --test_mode single
 
-# Regenerate HTML report from latest local structured data
+# Enable model thinking
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --enable_thinking True
+
+# Regenerate HTML report from latest structured data
 uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
-
 ```
 
 ## Architecture
 
-### Plugin-based Agent system
-Agents are loaded dynamically via `core/agent_factory.py` using `importlib`. The `--agent` flag takes `module.path:ClassName` format (e.g., `agents.agent_plus:AdvancedRetrievalAgent`). All agents must extend `agents.base_agent.ModelProvider`. The base class provides default implementations for `generate_prompt`, `encode_text_to_tokens`, `decode_tokens`, `_create_chat_completion`, and answer post-processing. Subclasses only need to implement:
-- `async evaluate_model(prompt: Dict) -> str` — main entry point
+Agents are dynamically loaded by `core/agent_factory.py` using the `module.path:ClassName` format. Public agents are intentionally limited:
 
-### Test modes
-- **multi**: Multiple needles inserted into different files at random depths, repeated `num_tests` times per test case
-- **single**: Grid search over context_length (1K–100K) and depth_percent (0–100%) with one needle
-
-### Agent hierarchy
-```
-ModelProvider (base_agent.py)         — abstract base + answer post-processing
-├── ExampleAgent (agent_template.py)  — random baseline
-├── SyncRetrievalAgent (sync_agent.py)— keyword retrieval + sentence extraction
-└── AdvancedRetrievalAgent (agent_plus.py) — BM25 + dense embedding + rerank hybrid
-    └── ScenarioAwareAgent (scenario_agent.py) — intent classification + dynamic prompts
+```text
+ModelProvider
+├── BaselineAgent
+└── HybridRetrievalAgent
+    └── ToolAugmentedAgent
 ```
 
-### Retrieval pipeline (AdvancedRetrievalAgent)
-Token-level chunking (500 tokens, 100 overlap) → BM25 keyword retrieval (top 30) → Dense vector retrieval via `ecnu-embedding-small` (top 20) → Merge & deduplicate → Rerank via `ecnu-rerank` (top 8) → Dynamic assembly with score threshold + neighbor enrichment. Falls back to full-context mode when total tokens < 64K.
+- `BaselineAgent`: minimal control group.
+- `HybridRetrievalAgent`: BM25 + dense embedding + rerank + neighbor chunk retrieval.
+- `ToolAugmentedAgent`: recommended path; adds scenario routing, structured extraction, deterministic Python tools, answer formatting, and tool-chain trace.
 
-### Evaluators
-- `LLMEvaluator`: Uses `ecnu-plus` as judge, scores 0–10 (semantic accuracy)
-- `StringMatchEvaluator`: Binary 0/1 exact match
+## Test Modes
 
-### Reporting
-Each evaluation writes one local structured data snapshot to `results/latest_evaluation_data.json`, overwriting the previous snapshot. Report generation is plugin-based: `core/reporter_factory.py` loads `reporters.deepseek_html_reporter:DeepSeekHtmlReporter` by default. The plugin renders `results/evaluation_report.html` from the structured data and uses `deepseek-v4-pro` with thinking enabled only for the product-analysis text. `generate_report.py` can regenerate the HTML report from local data without rerunning evaluation.
+- `multi`: multiple needles inserted into different files at random depths, repeated `num_tests` times per test case.
+- `single`: grid search over `context_length x depth_percent` with one needle.
 
-### Model configuration
-All ECNU model names are centralized in `core/ecnu_constants.py`. Evaluation environment variables: `ECNU_API_KEY`, `ECNU_BASE_URL`, `MODEL_NAME`. Report analysis environment variables: `DS_API_KEY`, `DS_BASE_URL`, `DS_MODEL_NAME`.
+## Reporting
+
+Each evaluation writes `results/latest_evaluation_data.json`, overwriting the previous snapshot. The default reporter renders `results/evaluation_report.html` and uses `deepseek-v4-pro` only for the product-analysis text.
+
+## Model Configuration
+
+ECNU model names are centralized in `core/ecnu_constants.py`. Evaluation uses `ECNU_API_KEY`, `ECNU_BASE_URL`, and `MODEL_NAME`. Report analysis uses `DS_API_KEY`, `DS_BASE_URL`, and `DS_MODEL_NAME`.
 
 ## Adding a New Agent
 
-1. Create `agents/your_agent.py`
-2. Subclass `ModelProvider` (or `AdvancedRetrievalAgent` for hybrid retrieval)
-3. Implement `async evaluate_model(prompt: Dict) -> str`
-4. Run with `--agent agents.your_agent:YourAgentClass`
-5. See `agents/agent_template.py` for a minimal reference implementation
+1. Create `agents/your_agent.py`.
+2. Subclass `ModelProvider` or `HybridRetrievalAgent`.
+3. Implement `async evaluate_model(prompt: Dict) -> str`.
+4. Run with `--agent agents.your_agent:YourAgentClass`.
 
-## Integrity Constraints (Assignment Rules)
-- Must NOT read original `PaulGrahamEssays/*.txt` files directly — context is provided at runtime
-- Must NOT read test case JSON files — questions are passed via the prompt dict
-- Must NOT hardcode answers
+## Integrity Constraints
+
+- Must not read original `PaulGrahamEssays/*.txt` files directly.
+- Must not read test case JSON files.
+- Must not hardcode answers.
