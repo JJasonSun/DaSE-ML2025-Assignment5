@@ -11,42 +11,47 @@ from reporters.base_reporter import BaseReporter
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_REPORT_MODEL_NAME = "deepseek-v4-pro"
 
-
-
 LABEL = {
-    "title": 'LLM 能力评测报告',
-    "subtitle": '结构化数据看板与 AI 产品分析',
-    "generated_at": '生成时间',
-    "analysis_title": 'AI 产品评测分析',
-    "analysis_model": '分析模型',
-    "model": '主测模型',
-    "test_mode": '测试模式',
-    "total_runs": '运行次数',
-    "mean_score": '平均分',
-    "evaluator": '评分器',
-    "cases": '用例数',
-    "thinking": '思考模式',
-    "enabled": '开启',
-    "disabled": '关闭',
-    "overview": '核心指标',
-    "overall": '得分分布',
-    "max_score": '最高分',
-    "min_score": '最低分',
-    "type_perf": '分类型表现',
-    "type": '类型',
-    "sample_count": '样本数',
-    "good_count": 'Good 数',
-    "bad_count": 'Bad Case 数',
-    "multi_detail": 'Multi 模式逐次表现',
-    "needle_depth": 'Needle 深度',
-    "single_heatmap": 'Single 模式热力图',
-    "bad_examples": '低分样例',
-    "score": '分数',
-    "question": '问题',
-    "ground_truth": '标准答案',
-    "response": '模型回答',
-    "ai_failed": 'AI 分析生成失败：',
-    "missing_key": '缺少 DS_API_KEY，已跳过 AI 文本分析。',
+    "title": "LLM Evaluation Report",
+    "subtitle": "Structured evaluation dashboard and AI product analysis",
+    "generated_at": "Generated at",
+    "analysis_title": "AI Product Analysis",
+    "analysis_model": "Analysis model",
+    "model": "Test model",
+    "test_mode": "Test mode",
+    "total_runs": "Runs",
+    "mean_score": "Mean score",
+    "evaluator": "Evaluator",
+    "cases": "Cases",
+    "thinking": "Thinking",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "overview": "Overview",
+    "overall": "Score Distribution",
+    "max_score": "Max score",
+    "min_score": "Min score",
+    "type_perf": "Performance by Type",
+    "type": "Type",
+    "sample_count": "Samples",
+    "good_count": "Good",
+    "bad_count": "Bad Cases",
+    "multi_detail": "Multi-run Detail",
+    "needle_depth": "Needle depth",
+    "single_heatmap": "Single-mode Heatmap",
+    "bad_examples": "Bad Cases",
+    "score": "Score",
+    "question": "Question",
+    "ground_truth": "Ground truth",
+    "response": "Model response",
+    "tool_diagnostics": "Tool Diagnostics",
+    "dimension": "Dimension",
+    "label": "Label",
+    "count": "Count",
+    "execution_path": "Execution path",
+    "task_type": "Task type",
+    "fallback_reason": "Fallback reason",
+    "ai_failed": "AI analysis generation failed: ",
+    "missing_key": "DS_API_KEY is missing, so AI text analysis was skipped.",
 }
 
 
@@ -77,32 +82,37 @@ class DeepSeekHtmlReporter(BaseReporter):
         mode = str(metrics.get("test_mode", data.get("config", {}).get("test_mode", "unknown"))).lower()
         mode_focus = self._analysis_focus_for_mode(mode)
         system = (
-            '你是严谨的 AI 产品评测分析师，只负责撰写报告中的文字解读。'
-            + '禁止输出 HTML、XML、CSS、JavaScript、代码块或完整网页结构。'
-            + '只能输出普通 Markdown 文本：短标题、短段落和项目符号。'
-            + '所有结论必须基于给定的结构化指标、Bad Case 和工具链诊断，不要编造缺失数据。'
+            "You are a rigorous AI product evaluation analyst. "
+            "You only write the narrative analysis section for an evaluation dashboard. "
+            "Do not output HTML, XML, CSS, JavaScript, code blocks, or full web page structures. "
+            "Output plain Markdown only. Write the content in Simplified Chinese. "
+            "All claims must be grounded in the provided structured metrics, bad cases, and tool diagnostics. "
+            "Do not invent missing data."
         )
         user = f"""
-{'请为评测数据看板生成“AI 产品评测分析”文字，不要生成 HTML。'}
+Generate the "AI Product Analysis" text for this evaluation dashboard.
+Do not generate HTML.
+Write in Simplified Chinese.
 
-{'必须包含以下四个部分：'}
-## {'总体结论'}
-## {'主要能力短板'}
-## Bad Case {'归因'}
-## {'可执行优化建议'}
+Required sections:
+## Overall Conclusion
+## Main Capability Gaps
+## Bad Case Attribution
+## Actionable Optimization Suggestions
 
-{'输出约束：'}
-- {'只能使用 Markdown 文本。'}
-- {'禁止输出任何 HTML 标签，例如 <html>、<body>、<section>、<div>、<table>。'}
-- {'禁止输出 ```html 或其它代码块。'}
-- {'不要写“下面是 HTML 代码”之类的话。'}
-- {'不要编造模型对比、用户行为、业务结果或未提供的原因。'}
-- {'必须结合工具链诊断，说明失败更可能发生在检索、结构化抽取、工具执行、回退路径还是答案格式。'}
+Output constraints:
+- Markdown text only.
+- No HTML tags such as <html>, <body>, <section>, <div>, or <table>.
+- No fenced code blocks.
+- Do not say "below is the HTML/code".
+- Do not invent model comparisons, user behavior, business outcomes, or unsupported causes.
+- Use tool diagnostics to explain whether failures are more likely caused by retrieval, structured extraction,
+  tool execution, fallback paths, or answer formatting.
 
-{'模式专属分析重点：'}
+Mode-specific analysis focus:
 {mode_focus}
 
-{'结构化评测数据：'}
+Structured evaluation data:
 {{
   "config": {data.get("config", {})},
   "metrics": {metrics},
@@ -122,23 +132,25 @@ class DeepSeekHtmlReporter(BaseReporter):
     def _analysis_focus_for_mode(self, mode: str) -> str:
         if mode == "single":
             return (
-                '- 这是单文档、单 needle 的长上下文扫描。\n'
-                + '- 优先分析模型对上下文长度和插入深度的敏感区间。\n'
-                + '- 识别 context_length x depth_percent 网格中的低分区域。\n'
-                + '- 判断失败是否更像长上下文退化、中间位置遗忘，或定位到 needle 后的答案抽取失败。\n'
-                + '- 优化建议需要落到提示词设计、检索兜底、上下文窗口策略和评测设置。'
+                "- This is a single-document, single-needle long-context scan.\n"
+                "- Focus on sensitivity to context length and needle insertion depth.\n"
+                "- Identify low-score regions in the context_length x depth_percent grid.\n"
+                "- Separate long-context degradation from answer extraction failures after the needle is found.\n"
+                "- Suggestions should target prompting, retrieval fallback, context window strategy, and evaluation setup."
             )
         if mode == "multi":
             return (
-                '- 这是多文档、多 needle 的检索与推理评测。\n'
-                + '- 优先分析跨文档检索、多 needle 聚合和证据组合能力。\n'
-                + '- 判断失败是否更可能来自漏掉某个 needle、召回无关 chunk、检索后的算术/日期/字符串推理错误，或答案格式漂移。\n'
-                + '- needle 深度统计只能作为辅助证据；没有数据支持时，不要过度归因于深度。\n'
-                + '- 优化建议需要落到混合检索、rerank 阈值、邻近 chunk 补充、工具增强和场景化推理。'
+                "- This is a multi-document, multi-needle retrieval and reasoning evaluation.\n"
+                "- Focus on cross-document retrieval, multi-needle aggregation, and evidence composition.\n"
+                "- Attribute failures to missing needles, irrelevant chunks, post-retrieval reasoning errors, "
+                "tool execution failures, or answer format drift when supported by data.\n"
+                "- Treat needle depth as supporting evidence only; do not over-attribute without data.\n"
+                "- Suggestions should target hybrid retrieval, rerank thresholds, neighbor chunk expansion, "
+                "tool augmentation, and scenario-specific reasoning."
             )
         return (
-            '- 当前测试模式未知。请保持保守，只分析显式指标和 Bad Case。\n'
-            + '- 除非数据明确支持，否则不要推断模式专属原因。'
+            "- The test mode is unknown. Stay conservative.\n"
+            "- Analyze only explicit metrics and bad cases. Do not infer mode-specific causes without data."
         )
 
     def _chat_with_retry(
@@ -180,157 +192,52 @@ class DeepSeekHtmlReporter(BaseReporter):
   <title>{LABEL["title"]}</title>
   <style>
     :root {{
-      --bg: #071018;
-      --bg-2: #0d1723;
-      --panel: rgba(13, 24, 36, .84);
-      --panel-strong: rgba(18, 31, 46, .96);
-      --ink: #e8f1f8;
-      --muted: #8ea1b5;
-      --line: rgba(123, 184, 210, .18);
-      --line-strong: rgba(127, 211, 255, .38);
-      --good: #35d18d;
-      --partial: #f5b84b;
-      --fail: #ff5f6d;
-      --cyan: #42d6ff;
-      --blue: #6c8cff;
-      --violet: #9c7cff;
-      --chip: rgba(66, 214, 255, .11);
-      --shadow: 0 22px 70px rgba(0, 0, 0, .34);
+      --bg: #071018; --bg-2: #0d1723; --panel: rgba(13, 24, 36, .84);
+      --ink: #e8f1f8; --muted: #8ea1b5; --line: rgba(123, 184, 210, .18);
+      --line-strong: rgba(127, 211, 255, .38); --good: #35d18d; --partial: #f5b84b;
+      --fail: #ff5f6d; --cyan: #42d6ff; --violet: #9c7cff; --shadow: 0 22px 70px rgba(0, 0, 0, .34);
     }}
     * {{ box-sizing: border-box; }}
-    html {{ scroll-behavior: smooth; }}
     body {{
-      margin: 0;
-      color: var(--ink);
+      margin: 0; color: var(--ink);
       background:
         linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0/42px 42px,
         linear-gradient(0deg, rgba(255,255,255,.03) 1px, transparent 1px) 0 0/42px 42px,
         radial-gradient(circle at 18% 8%, rgba(66, 214, 255, .22), transparent 34%),
         radial-gradient(circle at 86% 12%, rgba(156, 124, 255, .18), transparent 30%),
         linear-gradient(145deg, var(--bg), var(--bg-2) 48%, #050b11);
-      font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
-      line-height: 1.58;
-      min-height: 100vh;
+      font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif; line-height: 1.58; min-height: 100vh;
     }}
-    body::before {{
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 18%, rgba(0,0,0,.24));
-      mix-blend-mode: screen;
-    }}
-    main {{ max-width: 1280px; margin: 0 auto; padding: 36px 22px 70px; position: relative; }}
-    header {{
-      position: relative;
-      display: grid;
-      grid-template-columns: 1.4fr .6fr;
-      gap: 24px;
-      align-items: end;
-      padding: 36px 0 30px;
-      margin-bottom: 18px;
-    }}
-    header::after {{
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
-      box-shadow: 0 0 26px rgba(66, 214, 255, .45);
-    }}
-    .eyebrow {{
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--cyan);
-      font: 800 12px/1.2 "Cascadia Mono", "Consolas", monospace;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-    }}
-    .eyebrow::before {{ content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--good); box-shadow: 0 0 16px var(--good); }}
-    h1 {{ margin: 10px 0 10px; font-size: clamp(34px, 5vw, 62px); line-height: .98; letter-spacing: 0; font-weight: 850; }}
+    main {{ max-width: 1280px; margin: 0 auto; padding: 36px 22px 70px; }}
+    header {{ display: grid; grid-template-columns: 1.4fr .6fr; gap: 24px; align-items: end; padding: 36px 0 30px; margin-bottom: 18px; border-bottom: 1px solid var(--line-strong); }}
+    .eyebrow {{ color: var(--cyan); font: 800 12px/1.2 "Cascadia Mono", monospace; letter-spacing: .14em; text-transform: uppercase; }}
+    h1 {{ margin: 10px 0; font-size: clamp(34px, 5vw, 62px); line-height: .98; letter-spacing: 0; font-weight: 850; }}
     h2 {{ margin: 0 0 16px; font-size: 18px; letter-spacing: .02em; }}
-    .stamp {{
-      justify-self: end;
-      min-width: 220px;
-      border: 1px solid var(--line-strong);
-      border-radius: 8px;
-      padding: 17px 18px;
-      background: linear-gradient(180deg, rgba(66,214,255,.13), rgba(10,20,31,.78));
-      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.08);
-    }}
+    .stamp {{ justify-self: end; min-width: 220px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 17px 18px; background: linear-gradient(180deg, rgba(66,214,255,.13), rgba(10,20,31,.78)); box-shadow: var(--shadow); }}
     .stamp strong {{ display: block; font-size: 42px; line-height: 1; margin: 7px 0; color: #fff; text-shadow: 0 0 24px rgba(66,214,255,.42); }}
     .muted {{ color: var(--muted); }}
-    section {{
-      position: relative;
-      background: linear-gradient(180deg, var(--panel), rgba(8, 17, 27, .88));
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 22px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(14px);
-      overflow: hidden;
-    }}
-    section::before {{
-      content: "";
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--cyan), transparent 38%, var(--violet));
-      opacity: .72;
-    }}
+    section {{ background: linear-gradient(180deg, var(--panel), rgba(8, 17, 27, .88)); border: 1px solid var(--line); border-radius: 10px; padding: 22px; margin-bottom: 16px; box-shadow: var(--shadow); backdrop-filter: blur(14px); overflow: hidden; }}
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }}
-    .card {{
-      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 15px;
-      min-height: 96px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
-    }}
-    .card:hover {{ border-color: var(--line-strong); transform: translateY(-1px); transition: .18s ease; }}
-    .metric-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; text-transform: uppercase; letter-spacing: .08em; }}
+    .card {{ background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)); border: 1px solid var(--line); border-radius: 8px; padding: 15px; min-height: 96px; }}
+    .metric-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", monospace; text-transform: uppercase; letter-spacing: .08em; }}
     .metric-value {{ font-size: 25px; font-weight: 780; margin-top: 9px; overflow-wrap: anywhere; color: #f7fbff; }}
     table {{ width: 100%; border-collapse: separate; border-spacing: 0; background: rgba(2,8,14,.22); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 12px 10px; text-align: left; vertical-align: top; }}
     tr:last-child td {{ border-bottom: 0; }}
-    th {{ color: #b7c7d8; font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; text-transform: uppercase; letter-spacing: .08em; background: rgba(66,214,255,.06); }}
-    td {{ color: #d8e4ee; }}
-    tr:hover td {{ background: rgba(66,214,255,.055); }}
+    th {{ color: #b7c7d8; font: 800 11px/1.2 "Cascadia Mono", monospace; text-transform: uppercase; letter-spacing: .08em; background: rgba(66,214,255,.06); }}
     .bar-row {{ display: grid; grid-template-columns: minmax(132px, 210px) 1fr 56px; align-items: center; gap: 12px; margin: 11px 0; }}
-    .bar-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", "Consolas", monospace; overflow-wrap: anywhere; }}
-    .bar-track {{ height: 18px; background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 16px rgba(0,0,0,.28); }}
+    .bar-label {{ color: var(--muted); font: 800 11px/1.2 "Cascadia Mono", monospace; overflow-wrap: anywhere; }}
+    .bar-track {{ height: 18px; background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }}
     .bar-fill {{ height: 100%; border-radius: 999px; box-shadow: 0 0 18px currentColor; }}
     .score-pill {{ text-align: right; font-weight: 850; color: #fff; font-variant-numeric: tabular-nums; }}
-    .analysis {{
-      display: grid;
-      gap: 14px;
-      font-size: 15px;
-      color: #dbe8f3;
-    }}
-    .analysis h3 {{
-      margin: 4px 0 2px;
-      color: #ffffff;
-      font-size: 18px;
-      letter-spacing: .01em;
-    }}
+    .analysis {{ display: grid; gap: 14px; font-size: 15px; color: #dbe8f3; }}
+    .analysis h3 {{ margin: 4px 0 2px; color: #ffffff; font-size: 18px; }}
     .analysis p {{ margin: 0; color: #cfdae5; }}
     .analysis ul {{ margin: 0; padding-left: 20px; display: grid; gap: 7px; }}
-    .analysis li::marker {{ color: var(--cyan); }}
-    .analysis strong {{ color: #fff; font-weight: 850; }}
     .heatmap-wrap {{ overflow-x: auto; }}
     .heatmap td, .heatmap th {{ text-align: center; white-space: nowrap; }}
-    .heat-cell {{ font-weight: 850; border-radius: 6px; color: #081018; border: 1px solid rgba(255,255,255,.28); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }}
-    @media (max-width: 880px) {{
-      header {{ grid-template-columns: 1fr; }}
-      .stamp {{ justify-self: start; }}
-      .grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      .bar-row {{ grid-template-columns: 1fr; }}
-      h1 {{ font-size: 34px; }}
-    }}
+    .heat-cell {{ font-weight: 850; border-radius: 6px; color: #081018; border: 1px solid rgba(255,255,255,.28); padding: 8px; }}
+    @media (max-width: 880px) {{ header, .grid {{ grid-template-columns: 1fr; }} .stamp {{ justify-self: start; }} .bar-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
@@ -444,13 +351,13 @@ class DeepSeekHtmlReporter(BaseReporter):
 
         return f"""
 <section>
-  <h2>工具链诊断</h2>
+  <h2>{LABEL["tool_diagnostics"]}</h2>
   <table>
-    <thead><tr><th>维度</th><th>标签</th><th>次数</th></tr></thead>
+    <thead><tr><th>{LABEL["dimension"]}</th><th>{LABEL["label"]}</th><th>{LABEL["count"]}</th></tr></thead>
     <tbody>
-      {rows(path_counts, "执行路径")}
-      {rows(task_counts, "任务类型")}
-      {rows(fallback_counts, "回退原因")}
+      {rows(path_counts, LABEL["execution_path"])}
+      {rows(task_counts, LABEL["task_type"])}
+      {rows(fallback_counts, LABEL["fallback_reason"])}
     </tbody>
   </table>
 </section>
@@ -491,9 +398,7 @@ class DeepSeekHtmlReporter(BaseReporter):
                 if score is None:
                     cells.append("<td>-</td>")
                 else:
-                    cells.append(
-                        f'<td><div class="heat-cell" style="background:{_heat_color(float(score))};padding:8px;">{float(score):.1f}</div></td>'
-                    )
+                    cells.append(f'<td><div class="heat-cell" style="background:{_heat_color(float(score))};">{float(score):.1f}</div></td>')
             rows.append(f"<tr><th>{depth}%</th>{''.join(cells)}</tr>")
         return f"""
 <section>
@@ -553,7 +458,6 @@ def _e(value: Any) -> str:
 
 
 def _markdown_to_html(text: str) -> str:
-    """Render a small, safe subset of Markdown used by report analysis output."""
     if not text:
         return "<p></p>"
 
@@ -614,8 +518,6 @@ def _sanitize_ai_analysis(text: str) -> str:
     clean = re.sub(r"(?is)<script.*?>.*?</script>", "", clean)
     clean = re.sub(r"(?is)<style.*?>.*?</style>", "", clean)
 
-    # If the model ignored instructions and produced HTML, keep the text content
-    # rather than rendering source code or trusting model-generated markup.
     if re.search(r"(?is)</?(html|body|section|div|table|tr|td|th|p|h[1-6]|ul|li)\b", clean):
         clean = re.sub(r"(?i)<br\s*/?>", "\n", clean)
         clean = re.sub(r"(?i)</(p|div|section|h[1-6]|li|tr)>", "\n", clean)

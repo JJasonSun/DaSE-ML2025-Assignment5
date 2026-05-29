@@ -42,13 +42,17 @@ class HybridRetrievalAgent(ModelProvider):
 
         self.prompts = {
             "system_prompt": (
-                "你是严谨的信息检索与推理专家，正在处理 Needle-in-a-Haystack 长上下文任务。"
-                "你的目标是在大量上下文中定位精确证据，并推导出正确答案。\n\n"
-                "原则：只使用给定上下文；内部完成证据定位、计算和交叉验证；"
-                "最终只输出答案本身，不要解释、前缀、项目符号或推理过程。"
-                "如果充分检索后仍无法确定，只返回 Unknown。"
+                "You are a rigorous evidence retrieval and reasoning agent for Needle-in-a-Haystack tasks. "
+                "Use only the supplied context. Internally locate all relevant evidence, cross-check entity-value "
+                "bindings, and perform any required reasoning before answering. "
+                "Return only the final answer. Do not include explanations, prefixes, markdown, bullet points, "
+                "citations, or reasoning traces. If the evidence is insufficient after careful search, return Unknown."
             ),
-            "user_prompt_template": "上下文：\n{context}\n\n问题：{question}\n\n请只输出最终答案，不要解释。",
+            "user_prompt_template": (
+                "Context:\n{context}\n\n"
+                "Question:\n{question}\n\n"
+                "Return the final answer only. Preserve exact digits, capitalization, and spelling when relevant."
+            ),
         }
 
     async def evaluate_model(self, prompt: Dict) -> str:

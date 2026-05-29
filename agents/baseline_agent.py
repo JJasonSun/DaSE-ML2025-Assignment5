@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Dict
+from typing import Dict, Optional
 
 from core.ecnu_constants import DEFAULT_ECNU_BASE_URL, ECNU_MAIN_MODEL_NAME
 from .base_agent import ModelProvider
@@ -12,7 +12,7 @@ class BaselineAgent(ModelProvider):
     Use it as a control group, not as the recommended evaluation agent.
     """
 
-    def __init__(self, api_key: str, base_url: str):
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         api_key = api_key or os.getenv("ECNU_API_KEY") or ""
         base_url = (base_url or os.getenv("ECNU_BASE_URL") or DEFAULT_ECNU_BASE_URL).rstrip("/")
         super().__init__(api_key=api_key, base_url=base_url)
@@ -34,8 +34,22 @@ class BaselineAgent(ModelProvider):
             return "Missing required input data"
 
         messages = [
-            {"role": "system", "content": "你是一个严格的答案抽取助手。请只基于给定上下文回答问题，并且只输出最终答案。"},
-            {"role": "user", "content": f"上下文：\n{selected_content}\n\n问题：{question}\n\n答案："},
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict answer extraction assistant for a Needle-in-a-Haystack evaluation. "
+                    "Answer only from the provided context. Return only the final answer, with no explanation, "
+                    "prefix, markdown, units unless explicitly requested, or reasoning trace."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Context:\n{selected_content}\n\n"
+                    f"Question:\n{question}\n\n"
+                    "Final answer only:"
+                ),
+            },
         ]
 
         response = await self._create_chat_completion(messages=messages)

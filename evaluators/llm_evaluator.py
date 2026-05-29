@@ -11,11 +11,11 @@ class LLMEvaluator(Evaluator):
 
     CRITERIA: Dict[str, str] = {
         "accuracy": """
-0 分：答案完全错误或与问题无关。
-3 分：答案有少量相关性，但包含重大错误。
-5 分：答案部分正确，但缺少关键信息。
-7 分：答案基本正确，但有轻微遗漏。
-10 分：答案完全准确，并与标准答案匹配。
+0: The answer is completely wrong or irrelevant.
+3: The answer is slightly related but contains major errors.
+5: The answer is partially correct but misses key information.
+7: The answer is mostly correct with minor omissions or formatting issues.
+10: The answer is fully correct and matches the ground truth.
 """
     }
 
@@ -27,7 +27,7 @@ class LLMEvaluator(Evaluator):
         self.eval_client = OpenAI(api_key=api_key, base_url=base_url)
 
     def _call_api(self, prompt: str, max_retries: int = 3) -> Optional[str]:
-        """封装 API 调用逻辑，含重试。"""
+        """Call the evaluator model with retry."""
         extra_body = {"thinking": {"type": "disabled"}}
 
         for attempt in range(max_retries):
@@ -36,7 +36,7 @@ class LLMEvaluator(Evaluator):
                     model=self.eval_model_name,
                     messages=[
                         {"role": "system",
-                         "content": "你是专业评测员。请只返回 0 到 10 之间的一个数字。"},
+                         "content": "You are a strict evaluator. Return only one number from 0 to 10."},
                         {"role": "user", "content": prompt}
                     ],
                     extra_body=extra_body,
@@ -53,16 +53,21 @@ class LLMEvaluator(Evaluator):
 
     def evaluate_response(self, response: str) -> int:
         """Evaluate a response using LLM."""
-        evaluation_prompt = f"""你是专业评测员。你的任务是根据模型答案与标准答案的匹配程度进行评分。
+        evaluation_prompt = f"""You are a strict evaluator. Score the model answer against the ground truth.
 
-问题：{self.question}
-标准答案：{self.ground_truth}
-模型答案：{response}
+Question:
+{self.question}
 
-评分标准：
+Ground truth:
+{self.ground_truth}
+
+Model answer:
+{response}
+
+Scoring rubric:
 {self.CRITERIA['accuracy']}
 
-请评估模型答案，并且只返回 0 到 10 之间的一个数字。不要包含任何解释或其它文本。"""
+Return only one number from 0 to 10. Do not include explanations or any other text."""
 
         score_text = self._call_api(evaluation_prompt)
 

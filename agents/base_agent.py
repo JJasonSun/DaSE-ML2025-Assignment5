@@ -37,8 +37,6 @@ class ModelProvider(ABC):
             tokens = tokens[:context_length]
         return self.tokenizer.decode(tokens)
 
-    # ---- Shared LLM call infrastructure ---- #
-
     async def _create_chat_completion(
         self,
         messages: List[Dict],
@@ -54,14 +52,7 @@ class ModelProvider(ABC):
         if response_format:
             params["response_format"] = response_format
 
-        extra_body: Dict = {}
-        if enable_thinking:
-            extra_body["thinking"] = {"type": "enabled"}
-        else:
-            extra_body["thinking"] = {"type": "disabled"}
-
-        if extra_body:
-            params["extra_body"] = extra_body
+        params["extra_body"] = {"thinking": {"type": "enabled" if enable_thinking else "disabled"}}
 
         client_to_use = self.client
         max_retries = 3
@@ -80,9 +71,11 @@ class ModelProvider(ABC):
                 return self._extract_content_from_response(raw)
             except Exception as exc:
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                 else:
                     return f"API error: {exc}" if exc else "API error"
+
+        return "API error"
 
     def _extract_content_from_response(self, result: dict) -> str:
         try:
@@ -99,15 +92,11 @@ class ModelProvider(ABC):
                 return reasoning.strip()
 
             return f"Empty response (finish_reason: {finish_reason})"
-        except Exception as e:
-            return f"Response parsing error: {str(e)[:80]}"
+        except Exception as exc:
+            return f"Response parsing error: {str(exc)[:80]}"
 
     def compress_final_answer(self, response: str) -> str:
-        """
-        压缩模型输出，只保留最终答案本身。
-
-        适用于包含解释、推理过程、Markdown、JSON 包装等情况。
-        """
+        """Compress model output and keep only the final answer."""
         if not isinstance(response, str):
             response = "" if response is None else str(response)
 
@@ -123,11 +112,7 @@ class ModelProvider(ABC):
         return text.strip()
 
     def finalize_answer(self, response: str) -> str:
-        """
-        仅在输出看起来包含解释、格式化包装或多余内容时，才回退到答案压缩。
-
-        对于已经足够干净的单行最终答案，尽量保留原始表达，仅做轻量归一化。
-        """
+        """Normalize a clean answer while stripping wrappers from noisy output."""
         if not isinstance(response, str):
             response = "" if response is None else str(response)
 
@@ -141,7 +126,7 @@ class ModelProvider(ABC):
         return self._normalize_answer(text).strip()
 
     def _strip_code_fences(self, text: str) -> str:
-        match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+        match = re.search(r"```(?:json|text)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
         if match:
             return match.group(1).strip()
         return text
@@ -152,11 +137,11 @@ class ModelProvider(ABC):
             if isinstance(data, dict):
                 for key in ("answer", "final_answer", "result", "output", "content"):
                     value = data.get(key)
-                    if isinstance(value, str) and value.strip():
-                        return value.strip()
+                    if isinstance(value, (str, int, float)) and str(value).strip():
+                        return str(value).strip()
                 for value in data.values():
-                    if isinstance(value, str) and value.strip():
-                        return value.strip()
+                    if isinstance(value, (str, int, float)) and str(value).strip():
+                        return str(value).strip()
         except Exception:
             pass
 
@@ -175,7 +160,7 @@ class ModelProvider(ABC):
             return text
 
         label_patterns = (
-            r"^(?:最终答案|答案|answer|final\s*answer|result)\s*[:：]\s*(.+)$",
+            r"^(?:answer|final\s*answer|result|output)\s*[:：]\s*(.+)$",
             r"^(?:the\s*)?answer\s*(?:is)?\s*[:：]\s*(.+)$",
         )
 
@@ -199,11 +184,6 @@ class ModelProvider(ABC):
             " reason:",
             " analysis:",
             " explanation:",
-            " 推理",
-            " 分析",
-            " 因为",
-            " 由于",
-            " 解释",
         )
 
         lower_text = text.lower()
@@ -215,9 +195,9 @@ class ModelProvider(ABC):
 
     def _normalize_answer(self, text: str) -> str:
         text = text.strip()
-        text = re.sub(r"^(?:[\-\*•+\s]*|\d+[\.\)]\s+)", "", text)
-        text = text.strip("\"'“”‘’")
-        text = text.rstrip(".,;:!?，。！？")
+        text = re.sub(r"^(?:[-*\s]*|\d+[\.\)]\s+)", "", text)
+        text = text.strip("\"'` ")
+        text = text.rstrip(".,;:!?")
         text = re.sub(r"\s+", " ", text)
         return text
 
@@ -229,12 +209,9 @@ class ModelProvider(ABC):
             return True
         if lowered.startswith("{") or lowered.startswith("["):
             return True
-        if re.match(r"^(?:最终答案|答案|answer|final\s*answer|result)\s*[:：]", text, re.IGNORECASE):
+        if re.match(r"^(?:answer|final\s*answer|result|output)\s*[:：]", text, re.IGNORECASE):
             return True
         if re.match(r"^(?:the\s*)?answer\s*(?:is)?\s*[:：]", text, re.IGNORECASE):
             return True
-        noisy_markers = (
-            " because ", " since ", " due to ", "analysis", "explanation", "reason",
-            "推理", "分析", "因为", "由于", "解释",
-        )
+        noisy_markers = (" because ", " since ", " due to ", "analysis", "explanation", "reason")
         return any(marker in lowered for marker in noisy_markers)
