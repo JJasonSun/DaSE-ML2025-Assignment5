@@ -14,9 +14,11 @@ from .hybrid_retrieval_agent import HybridRetrievalAgent
 
 class ToolAugmentedAgent(HybridRetrievalAgent):
     """
-    Productized agent: retrieval + structured extraction + deterministic tools.
-    LLMs locate and structure evidence; Python handles exact arithmetic/date/string work.
+    Planner-first agent: LLMs create a structured operation plan; Python executes
+    only deterministic, verifiable tools.
     """
+
+    SUPPORTED_TASKS = {"computation", "date_time", "string_analysis", "encoding"}
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         super().__init__(api_key=api_key, base_url=base_url)
@@ -28,44 +30,52 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
         if not question:
             return "Missing required input data"
 
-        task_type = self._classify_task(question)
-        if task_type == "general":
-            return await self._fallback(prompt, "unsupported_task_type", task_type)
-
         context = self._select_context(prompt, question)
-        extraction = await self._extract_structured_evidence(question, context, task_type)
+        plan = await self._create_operation_plan(question, context)
+        answer, validation = self._run_plan(question, context, plan)
+        planner_attempts = 1
+        execution_mode = "planned_tool"
 
-        answer = self._solve_with_tools(question, context, task_type, extraction)
-        repaired = False
-        if answer is None and self._last_tool_failure_reason == "missing_required_evidence":
-            repaired_extraction = await self._repair_structured_evidence(question, context, task_type, extraction)
-            if repaired_extraction:
-                repaired = True
-                extraction = repaired_extraction
-                answer = self._solve_with_tools(question, context, task_type, extraction)
+        if answer is None:
+            repaired_plan = await self._repair_operation_plan(
+                question,
+                context,
+                plan,
+                self._last_tool_failure_reason or validation.get("status") or "unsupported_operation",
+            )
+            planner_attempts = 2
+            if repaired_plan:
+                repaired_answer, repaired_validation = self._run_plan(question, context, repaired_plan)
+                if repaired_answer is not None:
+                    plan = repaired_plan
+                    answer = repaired_answer
+                    validation = repaired_validation
+                    execution_mode = "repaired_planned_tool"
 
         if answer is not None and str(answer).strip():
-            self.last_trace = {
-                "agent": self.__class__.__name__,
-                "path": "tool_augmented",
-                "task_type": task_type,
-                "extraction": extraction,
-                "tool_answer": answer,
-                "fallback_reason": None,
-                "repair_attempted": repaired,
-                "context_chars": len(context),
-            }
+            self._record_trace(
+                plan=plan,
+                answer=answer,
+                validation=validation,
+                planner_attempts=planner_attempts,
+                execution_mode=execution_mode,
+                context=context,
+            )
             return self.finalize_answer(str(answer))
 
-        failure_reason = self._last_tool_failure_reason or "unsupported_operation"
+        failure_reason = self._last_tool_failure_reason or validation.get("status") or "unsupported_operation"
         self.last_trace = {
             "agent": self.__class__.__name__,
             "path": "tool_augmented_failed",
-            "task_type": task_type,
-            "extraction": extraction,
+            "task_type": self._plan_task_type(plan),
+            "operation_plan": plan,
+            "extraction": plan,
             "tool_answer": None,
+            "validation_result": validation,
+            "tool_failure_reason": failure_reason,
             "fallback_reason": failure_reason,
-            "repair_attempted": repaired,
+            "planner_attempts": planner_attempts,
+            "execution_mode": "failed",
             "context_chars": len(context),
         }
         return "Unknown"
@@ -82,8 +92,12 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             "agent": self.__class__.__name__,
             "path": "fallback_to_hybrid",
             "task_type": task_type,
+            "operation_plan": extraction or {},
             "extraction": extraction or {},
             "fallback_reason": reason,
+            "tool_failure_reason": reason,
+            "planner_attempts": 0,
+            "execution_mode": "fallback_to_hybrid",
         }
         return response
 
@@ -97,178 +111,62 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
         if int(full_context["total_tokens"]) <= self.full_context_threshold_tokens:
             return str(full_context["text"])
 
-        return self._retrieve_with_hybrid(question, context_data, queries=self._tool_retrieval_queries(question))["evidence_text"]
+        return self._retrieve_with_hybrid(question, context_data, queries=self._tool_retrieval_queries(question))[
+            "evidence_text"
+        ]
 
     def _tool_retrieval_queries(self, question: str) -> List[str]:
-        q = question.lower()
         queries = [question]
-        phrase_map = {
-            "inventory system id": "Inventory System ID",
-            "batch size constraint": "Batch Size Constraint",
-            "encryption offset": "encryption offset",
-            "decryption base": "decryption base",
-            "temporal multiplier": "Temporal Multiplier",
-            "security divisor": "Security Divisor",
-            "master access code part a": "Master Access Code Part A",
-            "backup code part b": "Backup Code Part B",
-            "guard shift pattern": "Guard Shift Pattern",
-            "universal assembly code": "universal assembly code",
-            "dimensional scaling factor": "dimensional scaling factor",
-            "primary antenna frequency coefficient": "Primary antenna frequency coefficient",
-            "secondary communication wavelength constant": "Secondary communication wavelength constant",
-            "inventory alpha": "Inventory ID Alpha",
-            "inventory beta": "Inventory ID Beta",
-            "cycle gamma": "Production Cycle ID Gamma",
-            "batch delta": "Batch Size ID Delta",
-            "production cycle": "Production Cycle ID Gamma",
-            "batch size": "Batch Size ID Delta",
-            "initial allocation": "Initial allocation value",
-            "final allocation": "Final allocation value",
-            "hyperdrive calibration constant": "Hyperdrive Calibration Constant",
-            "nexus stabilization factor": "Nexus Stabilization Factor",
-            "encoded payload": "encoded payload",
-            "encoded string": "encoded string",
-            "base64": "base64 encoded payload",
-            "md5": "MD5 hash payload",
-        }
-        for key, phrase in phrase_map.items():
-            if key in q and phrase not in queries:
-                queries.append(phrase)
-        return queries
-
-    def _classify_task(self, question: str) -> str:
-        q = question.lower()
-
-        string_markers = (
-            "count",
-            "occurrence",
-            "position",
-            "index",
-            "substring",
-            "character",
-            "length",
-            "reverse",
-            "backwards",
-            "read backwards",
-            "confirmation code",
-            "sum of all hexadecimal digits",
-            "hexadecimal digits (0-9 only)",
-        )
-        if self._has_task_marker(q, string_markers):
-            return "string_analysis"
-
-        date_markers = ("day of the week", "weekday", "date", "deadline", "delivery", "launch")
-        if self._has_task_marker(q, date_markers):
-            return "date_time"
-
-        encoding_markers = (
-            "base64",
-            "base32",
-            "base16",
-            "hex encoded",
-            "hexadecimal",
-            "ascii hex",
-            "caesar",
-            "julius",
-            "cipher",
-            "decode",
-            "decoded",
-            "encoded signal",
+        generic_terms = (
             "encoded string",
+            "encoded payload",
             "payload",
-            "rotate",
-            "rotation",
-            "alphabet rotation",
-            "original identifier",
-            "web encoding",
-            "web-safe",
-            "ascii-based substitution",
-            "standard web encoding",
-        )
-        if self._has_task_marker(q, encoding_markers):
-            return "encoding"
-
-        computation_markers = (
-            "difference",
-            "differential",
-            "sum",
-            "total",
-            "product",
-            "ratio",
-            "divide",
-            "divided",
-            "division",
-            "multiply",
-            "full simulation",
-            "how many",
-            "magnitude",
-            "cycles",
-            "integer division",
-            "square root",
-            "sqrt",
-            "lock code",
-            "coefficient",
+            "hash",
+            "date",
+            "integer",
+            "identifier",
+            "code",
             "constant",
-            "per-layer",
-            "decryption key",
-            "master key",
-            "encryption layers",
+            "factor",
+            "divisor",
+            "batch",
+            "cycle",
         )
-        if self._has_task_marker(q, computation_markers):
-            return "computation"
+        q = question.lower()
+        for term in generic_terms:
+            if term in q:
+                queries.append(term)
+        for token in re.findall(r"\b[A-Za-z][A-Za-z0-9_-]*\d[A-Za-z0-9_-]*\b", question):
+            queries.append(token)
+        for quoted in re.findall(r"['\"]([^'\"]{3,80})['\"]", question):
+            queries.append(quoted)
 
-        return "general"
+        ordered: List[str] = []
+        seen = set()
+        for query in queries:
+            clean = query.strip()
+            if clean and clean.lower() not in seen:
+                ordered.append(clean)
+                seen.add(clean.lower())
+        return ordered
 
-    def _has_task_marker(self, question: str, markers: Tuple[str, ...]) -> bool:
-        return any(re.search(rf"\b{re.escape(marker)}\b", question) for marker in markers)
-
-    async def _extract_structured_evidence(self, question: str, context: str, task_type: str) -> Dict:
-        prompt = (
-            "You are a structured evidence extraction component for a Needle-in-a-Haystack evaluator.\n"
-            "Return only valid JSON. Do not explain.\n\n"
-            "Schema:\n"
-            "{\n"
-            '  "task_type": "computation|date_time|string_analysis|encoding",\n'
-            '  "evidence_items": [\n'
-            '    {"entity": "stable_machine_name", "value": "exact value", "unit_or_type": "unit/type", '
-            '"source_snippet": "short verbatim evidence"}\n'
-            "  ],\n"
-            '  "operation": "a Python-style expression or concise operation description",\n'
-            '  "constraints": ["format rules, date boundary rules, decoding method, or arithmetic rules"]\n'
-            "}\n\n"
-            "Extraction rules:\n"
-            "- Include every number, encoded token, date, string, or shift value required to answer the question.\n"
-            "- Use stable snake_case entity names when possible, for example base_mineral_reserves.\n"
-            "- For computation tasks, make operation executable when possible using the entity names.\n"
-            "- For computation tasks, include all operands; do not omit constants, divisors, or multipliers.\n"
-            "- For encoding tasks, separate payload, method, and shift/key/rule into different evidence_items.\n"
-            "- For string tasks, preserve complete strings exactly, including case; do not truncate hashes or payloads.\n"
-            "- For date tasks, preserve exact dates and identify whether the answer needs a date, weekday, or day count.\n\n"
-            f"Task type: {task_type}\n"
-            f"Question:\n{question}\n\n"
-            f"Context:\n{context[:24000]}\n\n"
-            "JSON:"
-        )
+    async def _create_operation_plan(self, question: str, context: str) -> Dict:
+        prompt = self._planner_prompt(question, context)
         response = await self._create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=ECNU_PLUS_MODEL_NAME,
             enable_thinking=False,
             response_format={"type": "json_object"},
         )
-        return self._parse_json_object(response)
+        return self._normalize_plan(self._parse_json_object(response), question)
 
-    async def _repair_structured_evidence(self, question: str, context: str, task_type: str, extraction: Dict) -> Dict:
+    async def _repair_operation_plan(self, question: str, context: str, plan: Dict, failure_reason: str) -> Dict:
         prompt = (
-            "The previous structured extraction was insufficient for deterministic tool execution.\n"
-            "Return only corrected JSON. Do not explain.\n\n"
-            "Required fixes:\n"
-            "- Include every missing encoded payload, shift/key/rule, number, date, or complete string needed by the operation.\n"
-            "- Keep payload, method, and shift/key/rule as separate evidence_items for encoding tasks.\n"
-            "- Preserve exact casing and full values. Do not truncate long hashes, identifiers, or encoded strings.\n"
-            "- If the operation requires a transform, express it as a Python-style operation where possible.\n\n"
-            f"Task type: {task_type}\n"
+            "The previous operation plan failed deterministic execution.\n"
+            "Return only corrected JSON using the same schema. Do not explain.\n\n"
+            f"Failure reason: {failure_reason}\n"
             f"Question:\n{question}\n\n"
-            f"Previous extraction:\n{json.dumps(extraction, ensure_ascii=False)}\n\n"
+            f"Previous plan:\n{json.dumps(plan, ensure_ascii=False)}\n\n"
             f"Context:\n{context[:24000]}\n\n"
             "Corrected JSON:"
         )
@@ -278,7 +176,129 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             enable_thinking=False,
             response_format={"type": "json_object"},
         )
-        return self._parse_json_object(response)
+        return self._normalize_plan(self._parse_json_object(response), question)
+
+    async def _extract_structured_evidence(self, question: str, context: str, task_type: str = "") -> Dict:
+        return await self._create_operation_plan(question, context)
+
+    async def _repair_structured_evidence(self, question: str, context: str, task_type: str, extraction: Dict) -> Dict:
+        return await self._repair_operation_plan(
+            question,
+            context,
+            extraction,
+            self._last_tool_failure_reason or "missing_required_evidence",
+        )
+
+    def _planner_prompt(self, question: str, context: str) -> str:
+        return (
+            "You are the planning component for a tool-augmented Needle-in-a-Haystack evaluator.\n"
+            "Return only valid JSON. Do not explain.\n\n"
+            "Schema:\n"
+            "{\n"
+            '  "task_type": "computation|date_time|string_analysis|encoding",\n'
+            '  "evidence_items": [\n'
+            '    {"entity": "stable_snake_case_name", "value": "exact value", '
+            '"unit_or_type": "integer|date|string|payload|method|shift", '
+            '"source_snippet": "short verbatim evidence"}\n'
+            "  ],\n"
+            '  "operation": "Python-style expression or concise tool operation",\n'
+            '  "expected_answer_format": "integer|date|weekday|string|identifier|unknown",\n'
+            '  "constraints": ["short execution constraints"]\n'
+            "}\n\n"
+            "Planning rules:\n"
+            "- Decide the task type semantically; do not rely on keyword matching.\n"
+            "- Include all operands, dates, strings, encoded payloads, methods, shifts, divisors, or constants needed.\n"
+            "- Use the entity names in the operation when possible.\n"
+            "- Prefer deterministic operations: arithmetic, date difference/weekday, count/reverse/slice, base64/hex/caesar decode.\n"
+            "- If evidence is insufficient, still list what is present and make the missing fields explicit in constraints.\n\n"
+            f"Question:\n{question}\n\n"
+            f"Context:\n{context[:24000]}\n\n"
+            "JSON:"
+        )
+
+    def _run_plan(self, question: str, context: str, plan: Dict) -> Tuple[Optional[str], Dict]:
+        self._last_tool_failure_reason = None
+        validation = self._validate_plan(plan)
+        if validation["status"] != "ok":
+            self._set_tool_failure(validation["status"])
+            return None, validation
+
+        answer = self._solve_with_tools(question, context, self._plan_task_type(plan), plan)
+        if answer is None:
+            validation = {"status": self._last_tool_failure_reason or "unsupported_operation"}
+        return answer, validation
+
+    def _validate_plan(self, plan: Dict) -> Dict:
+        task_type = self._plan_task_type(plan)
+        if task_type not in self.SUPPORTED_TASKS:
+            return {"status": "unsupported_operation", "missing": ["task_type"]}
+        if not self._evidence_items(plan):
+            return {"status": "missing_required_evidence", "missing": ["evidence_items"]}
+        return {"status": "ok"}
+
+    def _record_trace(
+        self,
+        plan: Dict,
+        answer: str,
+        validation: Dict,
+        planner_attempts: int,
+        execution_mode: str,
+        context: str,
+    ) -> None:
+        self.last_trace = {
+            "agent": self.__class__.__name__,
+            "path": "tool_augmented",
+            "task_type": self._plan_task_type(plan),
+            "operation_plan": plan,
+            "extraction": plan,
+            "tool_answer": answer,
+            "validation_result": validation,
+            "tool_failure_reason": None,
+            "fallback_reason": None,
+            "planner_attempts": planner_attempts,
+            "execution_mode": execution_mode,
+            "context_chars": len(context),
+        }
+
+    def _normalize_plan(self, plan: Dict, question: str) -> Dict:
+        if not isinstance(plan, dict):
+            plan = {}
+        normalized = dict(plan)
+        normalized["task_type"] = self._normalize_task_type(str(normalized.get("task_type") or "")) or self._classify_task(
+            question
+        )
+        items = normalized.get("evidence_items") or normalized.get("evidence") or []
+        normalized["evidence_items"] = [item for item in items if isinstance(item, dict)]
+        normalized["operation"] = str(normalized.get("operation") or "").strip()
+        normalized["expected_answer_format"] = str(normalized.get("expected_answer_format") or "unknown")
+        constraints = normalized.get("constraints") or []
+        normalized["constraints"] = constraints if isinstance(constraints, list) else [str(constraints)]
+        return normalized
+
+    def _normalize_task_type(self, value: str) -> str:
+        value = value.lower().strip()
+        aliases = {
+            "math": "computation",
+            "calculation": "computation",
+            "date": "date_time",
+            "datetime": "date_time",
+            "string": "string_analysis",
+            "text": "string_analysis",
+            "decode": "encoding",
+        }
+        return value if value in self.SUPPORTED_TASKS else aliases.get(value, "")
+
+    def _classify_task(self, question: str) -> str:
+        q = question.lower()
+        if any(term in q for term in ("decode", "encoded", "cipher", "base64", "base32", "base16", "hex")):
+            return "encoding"
+        if any(term in q for term in ("date", "weekday", "day of the week", "deadline", "launch", "elapsed")):
+            return "date_time"
+        if any(term in q for term in ("count", "occurrence", "reverse", "backwards", "substring", "character")):
+            return "string_analysis"
+        if any(term in q for term in ("calculate", "difference", "sum", "product", "divide", "ratio", "sqrt", "root")):
+            return "computation"
+        return "computation" if re.search(r"\d", question) else "general"
 
     def _parse_json_object(self, text: str) -> Dict:
         if not text:
@@ -288,79 +308,55 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
         if match:
             clean = match.group(1)
         try:
-            data = json.loads(clean)  # type: ignore[name-defined]
+            data = json.loads(clean)
             return data if isinstance(data, dict) else {}
         except Exception:
             return {}
 
-    def _solve_with_tools(self, question: str, context: str, task_type: str, extraction: Dict) -> Optional[str]:
+    def _solve_with_tools(self, question: str, context: str, task_type: str, plan: Dict) -> Optional[str]:
         self._last_tool_failure_reason = None
-        supported_tasks = {"computation", "date_time", "string_analysis", "encoding"}
-        extraction_task_type = extraction.get("task_type") if isinstance(extraction.get("task_type"), str) else None
-        effective_task_type = task_type if task_type in supported_tasks else extraction_task_type
-        if (
-            task_type == "string_analysis"
-            and extraction_task_type == "computation"
-            and self._looks_like_arithmetic_operation(extraction.get("operation"))
-        ):
-            effective_task_type = "computation"
-        if self._has_date_evidence(extraction) and self._asks_for_date_difference(question, extraction):
-            effective_task_type = "date_time"
-        if effective_task_type not in supported_tasks:
-            effective_task_type = task_type
+        task_type = self._plan_task_type(plan) if self._plan_task_type(plan) in self.SUPPORTED_TASKS else task_type
 
-        operation_answer = self._evaluate_extracted_string_operation(question, context, extraction)
+        operation_answer = self._evaluate_extracted_string_operation(question, context, plan)
         if operation_answer is not None:
-            self._last_tool_failure_reason = None
             return operation_answer
 
-        answer: Optional[str]
-        if effective_task_type == "computation":
-            answer = self._solve_computation(question, context, extraction)
-        elif effective_task_type == "date_time":
-            answer = self._solve_date_time(question, context, extraction)
-        elif effective_task_type == "string_analysis":
-            answer = self._solve_string_analysis(question, context, extraction)
-        elif effective_task_type == "encoding":
-            answer = self._solve_encoding(question, context, extraction)
-        else:
-            answer = None
+        if self._has_date_evidence(plan) and self._asks_for_date_difference(question, plan):
+            task_type = "date_time"
 
-        if answer is not None:
-            self._last_tool_failure_reason = None
-            return answer
+        solvers = {
+            "computation": self._solve_computation,
+            "date_time": self._solve_date_time,
+            "string_analysis": self._solve_string_analysis,
+            "encoding": self._solve_encoding,
+        }
+        solver = solvers.get(task_type)
+        if not solver:
+            self._set_tool_failure("unsupported_operation")
+            return None
+        return solver(question, context, plan)
 
-        self._set_tool_failure("unsupported_operation")
-        return None
-
-    def _looks_like_arithmetic_operation(self, operation: object) -> bool:
-        return isinstance(operation, str) and bool(re.search(r"\babs\s*\(|//|[+\-*/%]", operation))
-
-    def _has_date_evidence(self, extraction: Dict) -> bool:
-        return any(re.search(r"\b\d{4}-\d{1,2}-\d{1,2}\b", value) for value in self._evidence_values(extraction))
-
-    def _asks_for_date_difference(self, question: str, extraction: Dict) -> bool:
-        source = f"{question}\n{extraction.get('operation', '')}".lower()
-        return any(term in source for term in ("days between", "elapsed", "difference in days", "datetime("))
+    def _plan_task_type(self, plan: Dict) -> str:
+        return self._normalize_task_type(str(plan.get("task_type") or ""))
 
     def _set_tool_failure(self, reason: str) -> None:
         if self._last_tool_failure_reason is None:
             self._last_tool_failure_reason = reason
 
-    def _evidence_items(self, extraction: Dict) -> List[Dict]:
-        items = extraction.get("evidence_items", []) or []
+    def _evidence_items(self, plan: Dict) -> List[Dict]:
+        items = plan.get("evidence_items", []) or []
         return [item for item in items if isinstance(item, dict)]
 
-    def _evidence_values(self, extraction: Dict) -> List[str]:
+    def _evidence_values(self, plan: Dict) -> List[str]:
         values = []
-        for item in self._evidence_items(extraction):
+        for item in self._evidence_items(plan):
             if item.get("value") is not None:
                 values.append(str(item["value"]))
         return values
 
-    def _string_evidence(self, extraction: Dict, context: str) -> Dict[str, str]:
+    def _string_evidence(self, plan: Dict, context: str) -> Dict[str, str]:
         variables: Dict[str, str] = {}
-        for idx, item in enumerate(self._evidence_items(extraction)):
+        for idx, item in enumerate(self._evidence_items(plan)):
             value = item.get("value")
             if value is None or isinstance(value, bool):
                 continue
@@ -373,19 +369,18 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
                 longer_hash = self._longest_hex_after_hash(context)
                 if longer_hash and len(longer_hash) > len(variables[name]):
                     variables[name] = longer_hash
-
         return variables
 
-    def _evaluate_extracted_string_operation(self, question: str, context: str, extraction: Dict) -> Optional[str]:
-        operation = extraction.get("operation")
-        if not isinstance(operation, str) or not operation.strip():
+    def _evaluate_extracted_string_operation(self, question: str, context: str, plan: Dict) -> Optional[str]:
+        operation = str(plan.get("operation") or "").strip()
+        if not operation:
             return None
-
-        variables = self._string_evidence(extraction, context)
+        variables = self._string_evidence(plan, context)
         if not variables:
             return None
 
-        expression = operation.strip()
+        expression = operation.split(";")[-1].strip()
+
         reverse_match = re.fullmatch(r"([A-Za-z_]\w*)\s*\[\s*::\s*-1\s*\]", expression)
         if reverse_match:
             value = variables.get(self._safe_identifier(reverse_match.group(1)))
@@ -436,9 +431,7 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             md5_match = re.fullmatch(pattern, expression)
             if md5_match:
                 value = variables.get(self._safe_identifier(md5_match.group(1)))
-                if value is None:
-                    return None
-                return hashlib.md5(value.encode("utf-8")).hexdigest()[: int(md5_match.group(2))]
+                return hashlib.md5(value.encode("utf-8")).hexdigest()[: int(md5_match.group(2))] if value else None
 
         caesar_match = re.fullmatch(
             r"(?:caesar_decode|decode_caesar)\(\s*([A-Za-z_]\w*)\s*,\s*(?:shift\s*=\s*)?([A-Za-z_]\w*|\d+)(?:\s*,.*)?\s*\)",
@@ -446,14 +439,9 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
         )
         if caesar_match:
             encoded = variables.get(self._safe_identifier(caesar_match.group(1)))
-            shift = self._resolve_shift(caesar_match.group(2), variables)
-            if encoded is not None and shift is not None:
-                decoded = self._caesar_decode(encoded, shift)
-                expected_prefix = self._expected_series_prefix(question, context, extraction)
-                if expected_prefix and not decoded.upper().startswith(expected_prefix):
-                    inferred = self._decode_caesar_to_expected_prefix(encoded, expected_prefix)
-                    return inferred or decoded
-                return decoded
+            shift_token = caesar_match.group(2)
+            shift_value = int(shift_token) if shift_token.isdigit() else self._number_from_value(variables.get(shift_token))
+            return self._caesar_decode(encoded, shift_value) if encoded is not None and shift_value is not None else None
 
         return None
 
@@ -472,22 +460,42 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             target = target.lower()
         return value.count(target)
 
-    def _resolve_shift(self, shift_token: str, variables: Dict[str, str]) -> Optional[int]:
-        if shift_token.isdigit():
-            return int(shift_token)
-        value = variables.get(self._safe_identifier(shift_token))
-        if value is None:
+    def _solve_computation(self, question: str, context: str, plan: Dict) -> Optional[str]:
+        answer = self._evaluate_extracted_operation(plan)
+        if answer is not None:
+            return str(answer)
+
+        q = question.lower()
+        numbers = [value for _, value in self._numeric_evidence(plan)]
+        if not numbers:
+            self._set_tool_failure("missing_required_evidence")
             return None
-        match = re.search(r"-?\d+", value)
-        return int(match.group(0)) if match else None
 
-    def _longest_hex_after_hash(self, context: str) -> Optional[str]:
-        matches = re.findall(r"\bhash[^:\n]*:\s*([0-9A-Fa-f]{16,})", context)
-        return max(matches, key=len) if matches else None
+        if any(term in q for term in ("square root", "integer square root", "sqrt")):
+            return str(math.isqrt(max(numbers)))
+        if len(numbers) < 2:
+            self._set_tool_failure("missing_required_evidence")
+            return None
+        if "difference" in q or "absolute" in q:
+            return str(abs(numbers[0] - numbers[1]))
+        if "sum" in q or "total" in q:
+            return str(sum(numbers))
+        if "product" in q or "multiply" in q:
+            product = 1
+            for number in numbers:
+                product *= number
+            return str(product)
+        if "divide" in q or "division" in q or "ratio" in q:
+            dividend = max(numbers)
+            divisors = [n for n in numbers if 0 < n != dividend]
+            return str(dividend // min(divisors)) if divisors else None
 
-    def _numeric_evidence(self, extraction: Dict) -> List[Tuple[str, int]]:
+        self._set_tool_failure("unsupported_operation")
+        return None
+
+    def _numeric_evidence(self, plan: Dict) -> List[Tuple[str, int]]:
         pairs: List[Tuple[str, int]] = []
-        for idx, item in enumerate(self._evidence_items(extraction)):
+        for idx, item in enumerate(self._evidence_items(plan)):
             value = item.get("value")
             if isinstance(value, bool):
                 continue
@@ -500,187 +508,15 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
                     pairs.append((str(item.get("entity") or f"value_{idx}"), int(numbers[0])))
         return pairs
 
-    def _numbers_from(self, question: str, context: str, extraction: Dict) -> List[int]:
-        evidence_numbers = [value for _, value in self._numeric_evidence(extraction)]
-        if evidence_numbers:
-            return evidence_numbers
-        source = "\n".join(self._evidence_values(extraction)) + "\n" + question
-        return [int(n) for n in re.findall(r"(?<![A-Za-z])-?\d{1,}(?![A-Za-z])", source.replace(",", ""))]
-
-    def _solve_computation(self, question: str, context: str, extraction: Dict) -> Optional[str]:
-        enriched_extraction = self._with_context_numeric_evidence(context, extraction)
-        answer = self._evaluate_extracted_operation(enriched_extraction)
-        if answer is not None:
-            return str(answer)
-
-        q = question.lower()
-        if (
-            self._last_tool_failure_reason == "missing_required_evidence"
-            and self._looks_like_arithmetic_operation(enriched_extraction.get("operation"))
-        ):
-            return None
-
-        if self._is_inventory_batch_formula(q):
-            labeled_numbers = self._labeled_numbers_from_context(context)
-            if len(labeled_numbers) < 4:
-                self._set_tool_failure("missing_required_evidence")
-                return None
-            alpha, beta, gamma, delta = labeled_numbers[:4]
-            return str(((alpha - beta) * gamma) // delta) if delta else None
-
-        numbers = self._numbers_from(question, context, enriched_extraction)
-        if len(numbers) < 2:
-            numbers = self._labeled_numbers_from_context(context)
-        if len(numbers) < 2:
-            if any(term in q for term in ("square root", "integer square root", "sqrt")) and numbers:
-                return str(math.isqrt(numbers[0]))
-            self._set_tool_failure("missing_required_evidence")
-            return None
-
-        if any(term in q for term in ("square root", "integer square root", "sqrt")):
-            return str(math.isqrt(max(numbers)))
-
-        if (
-            "difference" in q
-            and ("multiply" in q or "product" in q)
-            and ("divide" in q or "integer division" in q)
-            and len(numbers) >= 4
-        ):
-            divisor = numbers[3]
-            return str(((numbers[0] - numbers[1]) * numbers[2]) // divisor) if divisor else None
-
-        if any(term in q for term in ("full simulation", "how many full", "can be completed")):
-            dividend = max(numbers)
-            divisors = [n for n in numbers if 0 < n != dividend]
-            return str(dividend // min(divisors)) if divisors else None
-
-        if "divide" in q or "division" in q or "ratio" in q or "per-layer" in q or "encryption layers" in q:
-            dividend = max(numbers)
-            divisors = [n for n in numbers if 0 < n != dividend]
-            return str(dividend // min(divisors)) if divisors else None
-
-        if "difference" in q or "absolute" in q:
-            return str(abs(numbers[0] - numbers[1]))
-        if "sum" in q or ("total" in q and "per" not in q):
-            return str(sum(numbers))
-        if "product" in q or "multiply" in q:
-            product = 1
-            for number in numbers:
-                product *= number
-            return str(product)
-        self._set_tool_failure("unsupported_operation")
-        return None
-
-    def _is_inventory_batch_formula(self, question: str) -> bool:
-        return all(term in question for term in ("inventory", "batch", "cycle")) and any(
-            term in question for term in ("alpha", "beta", "gamma", "delta")
-        )
-
-    def _labeled_numbers_from_context(self, context: str) -> List[int]:
-        label_patterns = (
-            r"inventory id alpha[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"inventory id beta[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"production cycle id gamma[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"batch size id delta[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"initial allocation value[^:=\n]{0,120}[:=]\s*(-?\d[\d,]*)",
-            r"final allocation value[^:=\n]{0,120}[:=]\s*(-?\d[\d,]*)",
-            r"hyperdrive calibration constant[^:=\n]{0,120}[:=]\s*(-?\d[\d,]*)",
-            r"nexus stabilization factor[^:=\n]{0,120}[:=]\s*(-?\d[\d,]*)",
-            r"master key[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"encryption layers?[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"agent id[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"division factor[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"left code[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"right code[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"guard shift pattern[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"universal assembly code[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"dimensional scaling factor[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"primary antenna frequency coefficient[^0-9-]{0,80}(-?\d[\d,]*)",
-            r"secondary communication wavelength constant[^0-9-]{0,80}(-?\d[\d,]*)",
-        )
-        numbers: List[int] = []
-        for pattern in label_patterns:
-            for match in re.finditer(pattern, context, re.IGNORECASE):
-                numbers.append(int(match.group(1).replace(",", "")))
-        return numbers
-
-    def _with_context_numeric_evidence(self, context: str, extraction: Dict) -> Dict:
-        operation = extraction.get("operation")
-        if not isinstance(operation, str) or not operation.strip():
-            return extraction
-
-        items = [dict(item) for item in self._evidence_items(extraction)]
-        changed = False
-        for item in items:
-            entity = self._safe_identifier(str(item.get("entity") or ""))
-            if not entity:
-                continue
-            context_value = self._number_for_label_from_context(entity, context)
-            if context_value is not None and str(item.get("value")) != str(context_value):
-                item["value"] = str(context_value)
-                changed = True
-
-        existing = {self._safe_identifier(entity) for entity, _ in self._numeric_evidence({"evidence_items": items})}
-        names = set(re.findall(r"\b[A-Za-z_]\w*\b", operation))
-        missing = [name for name in names if name not in existing and name not in {"abs", "int", "math"}]
-        if not missing:
-            if not changed:
-                return extraction
-            enriched = dict(extraction)
-            enriched["evidence_items"] = items
-            return enriched
-
-        for name in missing:
-            value = self._number_for_label_from_context(name, context)
-            if value is not None:
-                items.append(
-                    {
-                        "entity": name,
-                        "value": str(value),
-                        "unit_or_type": "integer",
-                        "source_snippet": name.replace("_", " "),
-                    }
-                )
-
-        if len(items) == len(self._evidence_items(extraction)):
-            return extraction
-        enriched = dict(extraction)
-        enriched["evidence_items"] = items
-        return enriched
-
-    def _number_for_label_from_context(self, name: str, context: str) -> Optional[int]:
-        label = name.replace("_", " ")
-        labels = [label]
-        for suffix in (" mars", " jupiter"):
-            if label.endswith(suffix):
-                labels.append(label[: -len(suffix)])
-        if "initial allocation" in label:
-            labels.append("initial allocation value")
-        if "final allocation" in label:
-            labels.append("final allocation value")
-        if "hyperdrive calibration constant" in label:
-            labels.append("hyperdrive calibration constant")
-        if "nexus stabilization factor" in label:
-            labels.append("nexus stabilization factor")
-        for candidate in labels:
-            escaped = re.escape(candidate)
-            match = re.search(rf"\b{escaped}\b[^:=\n]{{0,120}}[:=]\s*(-?\d[\d,]*)", context, re.IGNORECASE)
-            if match:
-                return int(match.group(1).replace(",", ""))
-            match = re.search(rf"\b{escaped}\b[^0-9-]{{0,80}}(-?\d[\d,]*)", context, re.IGNORECASE)
-            if match:
-                return int(match.group(1).replace(",", ""))
-        return None
-
-    def _evaluate_extracted_operation(self, extraction: Dict) -> Optional[int]:
-        operation = extraction.get("operation")
-        if not isinstance(operation, str) or not operation.strip():
+    def _evaluate_extracted_operation(self, plan: Dict) -> Optional[int]:
+        operation = str(plan.get("operation") or "").strip()
+        if not operation:
             self._set_tool_failure("unsupported_operation")
             return None
 
         variables: Dict[str, int] = {}
         replacements: List[Tuple[str, str]] = []
-        for idx, (entity, value) in enumerate(self._numeric_evidence(extraction)):
+        for idx, (entity, value) in enumerate(self._numeric_evidence(plan)):
             name = self._safe_identifier(entity) or f"value_{idx}"
             unique_name = name
             suffix = 2
@@ -695,7 +531,7 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             self._set_tool_failure("missing_required_evidence")
             return None
 
-        expression = operation.strip()
+        expression = operation
         for source, target in sorted(replacements, key=lambda x: len(x[0]), reverse=True):
             if source and source != target:
                 expression = re.sub(rf"\b{re.escape(source)}\b", target, expression, flags=re.IGNORECASE)
@@ -742,27 +578,19 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
                 return left % right
             if isinstance(node.op, ast.Pow):
                 if right == 0.5:
-                    return float(math.isqrt(int(left)))
+                    return math.isqrt(int(left))
                 return left**right
         raise ValueError("Unsupported expression")
 
-    def _safe_identifier(self, text: str) -> str:
-        name = re.sub(r"[^0-9A-Za-z_]+", "_", text.strip().lower()).strip("_")
-        if not name:
-            return ""
-        if name[0].isdigit():
-            name = f"value_{name}"
-        return name
-
-    def _solve_date_time(self, question: str, context: str, extraction: Dict) -> Optional[str]:
-        source = "\n".join(self._evidence_values(extraction)) + "\n" + question
+    def _solve_date_time(self, question: str, context: str, plan: Dict) -> Optional[str]:
+        source = "\n".join(self._evidence_values(plan)) + "\n" + question
         dates = self._extract_dates(source)
         if not dates:
             self._set_tool_failure("missing_required_evidence")
             return None
 
-        q = question.lower()
-        if len(dates) >= 2 and any(term in q for term in ("how many days", "days between", "number of days")):
+        q = f"{question}\n{plan.get('operation', '')}\n{plan.get('expected_answer_format', '')}".lower()
+        if len(dates) >= 2 and any(term in q for term in ("how many days", "days between", "elapsed", "difference")):
             return str(abs((dates[0] - dates[1]).days))
 
         date = dates[0]
@@ -772,7 +600,7 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             direction = offset_match.group(2).lower()
             date = date - timedelta(days=days) if direction in ("before", "prior to") else date + timedelta(days=days)
 
-        if any(term in q for term in ("day of the week", "weekday", "what day")):
+        if any(term in q for term in ("day of the week", "weekday", "what day", "weekday")):
             return date.strftime("%A")
         return f"{date.strftime('%B')} {date.day}, {date.year}"
 
@@ -796,9 +624,9 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
                 pass
         return dates
 
-    def _solve_string_analysis(self, question: str, context: str, extraction: Dict) -> Optional[str]:
+    def _solve_string_analysis(self, question: str, context: str, plan: Dict) -> Optional[str]:
         q = question.lower()
-        values = self._evidence_values(extraction)
+        values = self._evidence_values(plan)
         candidates = values + [self._quoted_value(question) or "", self._quoted_value(context) or ""]
 
         if "sum of all hexadecimal digits" in q or "hexadecimal digits (0-9 only)" in q:
@@ -808,10 +636,8 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             self._set_tool_failure("missing_required_evidence")
             return None
 
-        target = self._quoted_value(question)
+        target = self._quoted_value(question) or self._target_after_phrase(question)
         haystack = self._best_string_haystack(values, target) or context
-        if not target:
-            target = self._target_after_phrase(question)
         if not target:
             self._set_tool_failure("missing_required_evidence")
             return None
@@ -823,62 +649,49 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             return str(idx) if idx >= 0 else None
         if "length" in q:
             return str(len(target))
+
         self._set_tool_failure("unsupported_operation")
         return None
 
-    def _solve_encoding(self, question: str, context: str, extraction: Dict) -> Optional[str]:
-        q = self._encoding_context_text(question, extraction)
-        candidates = self._encoded_candidates(question, context, extraction)
+    def _solve_encoding(self, question: str, context: str, plan: Dict) -> Optional[str]:
+        text = self._encoding_context_text(question, plan)
+        candidates = self._encoded_candidates(question, context, plan)
         if not candidates:
-            self._last_tool_failure_reason = "missing_required_evidence"
+            self._set_tool_failure("missing_required_evidence")
             return None
 
-        methods = self._encoding_methods(q)
+        methods = self._encoding_methods(text)
         if not methods:
             self._set_tool_failure("unsupported_operation")
             return None
 
         invalid_output = False
-        expected_prefix = self._expected_series_prefix(question, context, extraction)
         for method in methods:
-            if method == "caesar":
-                shift = self._shift_from_evidence(extraction) or self._extract_shift(q)
-                if shift is None:
-                    self._set_tool_failure("missing_required_evidence")
-                    continue
-            else:
-                shift = None
+            shift = self._shift_from_evidence(plan) or self._extract_shift(text) if method == "caesar" else None
+            if method == "caesar" and shift is None:
+                self._set_tool_failure("missing_required_evidence")
+                continue
 
             for encoded in candidates:
                 decoded = self._decode_candidate(encoded, method, shift)
-                if decoded is None:
-                    continue
-                if self._is_valid_decoded_text(decoded):
-                    if method == "caesar" and expected_prefix and not decoded.upper().startswith(expected_prefix):
-                        inferred = self._decode_caesar_to_expected_prefix(encoded, expected_prefix)
-                        if inferred and self._is_valid_decoded_text(inferred):
-                            return inferred
-                        invalid_output = True
-                        continue
+                if decoded and self._is_valid_decoded_text(decoded):
                     return decoded
                 invalid_output = True
 
         self._set_tool_failure("invalid_decoded_output" if invalid_output else "invalid_operation_parse")
         return None
 
-    def _encoding_context_text(self, question: str, extraction: Dict) -> str:
-        values = "\n".join(self._evidence_values(extraction))
-        operation = str(extraction.get("operation") or "")
-        constraints = "\n".join(str(item) for item in extraction.get("constraints", []) or [])
+    def _encoding_context_text(self, question: str, plan: Dict) -> str:
+        values = "\n".join(self._evidence_values(plan))
+        operation = str(plan.get("operation") or "")
+        constraints = "\n".join(str(item) for item in plan.get("constraints", []) or [])
         return f"{question}\n{values}\n{operation}\n{constraints}".lower()
 
     def _encoding_methods(self, text: str) -> List[str]:
         methods: List[str] = []
         if any(term in text for term in ("caesar", "julius", "shift", "rotate", "rotation")):
             methods.append("caesar")
-        if any(term in text for term in ("mirror", "backwards", "read backward", "read backwards", "reverse-order", "reverse order")):
-            methods.append("reverse")
-        elif "reverse" in text and not any(term in text for term in ("reverse caesar", "reverse shift")):
+        if any(term in text for term in ("mirror", "backward", "backwards", "reverse")):
             methods.append("reverse")
         if "base32" in text:
             methods.append("base32")
@@ -910,24 +723,22 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             return None
         return None
 
-    def _encoded_candidates(self, question: str, context: str, extraction: Dict) -> List[str]:
+    def _encoded_candidates(self, question: str, context: str, plan: Dict) -> List[str]:
         scored: List[Tuple[int, str]] = []
-        for item in self._evidence_items(extraction):
+        for item in self._evidence_items(plan):
             value = str(item.get("value") or "").strip()
             if not value:
                 continue
             meta = f"{item.get('entity', '')} {item.get('unit_or_type', '')} {item.get('source_snippet', '')}".lower()
             score = 0
-            if any(term in meta for term in ("encoded", "ciphertext", "signal", "payload", "code", "identifier", "callsign", "message")):
+            if any(term in meta for term in ("encoded", "ciphertext", "signal", "payload", "code", "identifier", "message")):
                 score += 4
-            if any(term in meta for term in ("protocol", "method", "standard", "section", "shift", "rotation", "cipher_method")):
+            if any(term in meta for term in ("method", "standard", "section", "shift", "rotation")):
                 score -= 4
             if self._looks_like_base64(value):
                 score += 2
             if self._normalize_hex_payload(value):
                 score += 2
-            if re.fullmatch(r"[A-Z0-9-]{5,}", value):
-                score += 1
             scored.append((score, value))
 
         for source in (question, context):
@@ -957,75 +768,15 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
             values.append(quoted)
         return values
 
-    def _normalize_hex_payload(self, text: str) -> Optional[str]:
-        bytes_with_prefix = re.findall(r"0x([0-9A-Fa-f]{2})", text)
-        if bytes_with_prefix:
-            return "".join(bytes_with_prefix)
-        compact = re.sub(r"[\s,;:-]", "", text)
-        if re.fullmatch(r"[0-9A-Fa-f]+", compact) and len(compact) % 2 == 0 and len(compact) >= 4:
-            return compact
-        return None
-
-    def _shift_from_evidence(self, extraction: Dict) -> Optional[int]:
-        for item in self._evidence_items(extraction):
+    def _shift_from_evidence(self, plan: Dict) -> Optional[int]:
+        for item in self._evidence_items(plan):
             meta = f"{item.get('entity', '')} {item.get('unit_or_type', '')} {item.get('source_snippet', '')}".lower()
-            if "augustus" in meta or "augustus" in str(item.get("value", "")).lower():
-                return 4
-            if not any(term in meta for term in ("shift", "rotation", "rotate", "key", "access code")):
+            if not any(term in meta for term in ("shift", "rotation", "rotate", "key")):
                 continue
             match = re.search(r"-?\d+", str(item.get("value", "")))
             if match:
                 return int(match.group(0))
         return None
-
-    def _expected_series_prefix(self, question: str, context: str, extraction: Dict) -> Optional[str]:
-        source = f"{question}\n{context}\n" + "\n".join(self._evidence_values(extraction))
-        match = re.search(r"\b([A-Z]{3,12})\s+series\b", source)
-        return match.group(1) if match else None
-
-    def _decode_caesar_to_expected_prefix(self, encoded: str, expected_prefix: str) -> Optional[str]:
-        letters = re.sub(r"[^A-Za-z]", "", encoded).upper()
-        if len(letters) < len(expected_prefix):
-            return None
-        shifts = []
-        for encoded_char, expected_char in zip(letters, expected_prefix):
-            shifts.append((ord(encoded_char) - ord(expected_char)) % 26)
-        if len(set(shifts)) != 1:
-            return None
-        return self._caesar_decode(encoded, shifts[0])
-
-    def _quoted_value(self, text: str) -> Optional[str]:
-        match = re.search(r"['\"]([^'\"]{1,500})['\"]", text)
-        return match.group(1) if match else None
-
-    def _target_after_phrase(self, question: str) -> Optional[str]:
-        match = re.search(r"(?:character|string|substring)\s+([A-Za-z0-9_-]{1,50})", question, re.IGNORECASE)
-        return match.group(1) if match else None
-
-    def _best_string_haystack(self, values: List[str], target: Optional[str]) -> Optional[str]:
-        if target:
-            containing = [value for value in values if target in value]
-            if containing:
-                return max(containing, key=len)
-        return max(values, key=len) if values else None
-
-    def _longest_alnum(self, values: List[str]) -> Optional[str]:
-        cleaned = [value for value in values if re.search(r"[A-Za-z0-9]", value)]
-        return max(cleaned, key=len) if cleaned else None
-
-    def _longest_hex_like(self, values: List[str]) -> Optional[str]:
-        matches: List[str] = []
-        for value in values:
-            matches.extend(re.findall(r"\b[0-9A-Fa-f]{16,}\b", value))
-        return max(matches, key=len) if matches else None
-
-    def _pad_base(self, text: str, block_size: int) -> str:
-        return text + "=" * ((block_size - len(text) % block_size) % block_size)
-
-    def _looks_like_base64(self, text: str) -> bool:
-        if not re.fullmatch(r"[A-Za-z0-9+/=_-]{8,}", text):
-            return False
-        return len(text) % 4 in (0, 2, 3)
 
     def _extract_shift(self, text: str) -> Optional[int]:
         digit_match = re.search(r"(?:shift|rotate|rotation|positions?|by exactly|by)[^A-Za-z0-9]{0,20}(\d+)", text)
@@ -1053,6 +804,69 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
         if key_word_match:
             return len(key_word_match.group(1))
         return None
+
+    def _number_from_value(self, value: Optional[str]) -> Optional[int]:
+        if value is None:
+            return None
+        match = re.search(r"-?\d+", str(value))
+        return int(match.group(0)) if match else None
+
+    def _has_date_evidence(self, plan: Dict) -> bool:
+        return any(re.search(r"\b\d{4}-\d{1,2}-\d{1,2}\b", value) for value in self._evidence_values(plan))
+
+    def _asks_for_date_difference(self, question: str, plan: Dict) -> bool:
+        source = f"{question}\n{plan.get('operation', '')}".lower()
+        return any(term in source for term in ("days between", "elapsed", "difference in days", "datetime("))
+
+    def _safe_identifier(self, text: str) -> str:
+        name = re.sub(r"[^0-9A-Za-z_]+", "_", text.strip().lower()).strip("_")
+        if not name:
+            return ""
+        if name[0].isdigit():
+            name = f"value_{name}"
+        return name
+
+    def _quoted_value(self, text: str) -> Optional[str]:
+        match = re.search(r"['\"]([^'\"]{1,500})['\"]", text)
+        return match.group(1) if match else None
+
+    def _target_after_phrase(self, question: str) -> Optional[str]:
+        match = re.search(r"(?:character|string|substring)\s+([A-Za-z0-9_-]{1,50})", question, re.IGNORECASE)
+        return match.group(1) if match else None
+
+    def _best_string_haystack(self, values: List[str], target: Optional[str]) -> Optional[str]:
+        if target:
+            containing = [value for value in values if target in value]
+            if containing:
+                return max(containing, key=len)
+        return max(values, key=len) if values else None
+
+    def _longest_hex_like(self, values: List[str]) -> Optional[str]:
+        matches: List[str] = []
+        for value in values:
+            matches.extend(re.findall(r"\b[0-9A-Fa-f]{16,}\b", value))
+        return max(matches, key=len) if matches else None
+
+    def _longest_hex_after_hash(self, context: str) -> Optional[str]:
+        matches = re.findall(r"(?:hash|token|vector|digest)[^:\n]{0,80}[:=]\s*([0-9A-Fa-f]{16,})", context, re.IGNORECASE)
+        return max(matches, key=len) if matches else None
+
+    def _normalize_hex_payload(self, text: str) -> Optional[str]:
+        bytes_with_prefix = re.findall(r"0x([0-9A-Fa-f]{2})", text)
+        if bytes_with_prefix:
+            return "".join(bytes_with_prefix)
+        compact = re.sub(r"[\s,;:-]", "", text)
+        if re.fullmatch(r"[0-9A-Fa-f]+", compact) and len(compact) % 2 == 0 and len(compact) >= 4:
+            return compact
+        return None
+
+    def _pad_base(self, text: str, block_size: int) -> str:
+        return text + "=" * ((block_size - len(text) % block_size) % block_size)
+
+    def _looks_like_base64(self, text: str) -> bool:
+        if not re.fullmatch(r"[A-Za-z0-9+/=_-]{8,}", text):
+            return False
+        return len(text) % 4 in (0, 2, 3)
 
     def _is_valid_decoded_text(self, text: str) -> bool:
         if not text:
