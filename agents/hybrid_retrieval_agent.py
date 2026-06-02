@@ -39,19 +39,23 @@ class HybridRetrievalAgent(ModelProvider):
         self.max_evidence_tokens = 32000
         self.max_ecnu_retrieval_chars = 8192
         self.last_trace: Dict = {}
+        self._last_retrieval_trace: Dict = {}
 
         self.prompts = {
             "system_prompt": (
                 "You are a rigorous evidence retrieval and reasoning agent for Needle-in-a-Haystack tasks. "
                 "Use only the supplied context. Internally locate all relevant evidence, cross-check entity-value "
-                "bindings, and perform any required reasoning before answering. "
+                "bindings, and perform any required reasoning before answering. For calculation, date, decoding, "
+                "or string-count questions, first identify the exact source values in the context, preserve every "
+                "digit and character, and only then derive the final answer. "
                 "Return only the final answer. Do not include explanations, prefixes, markdown, bullet points, "
                 "citations, or reasoning traces. If the evidence is insufficient after careful search, return Unknown."
             ),
             "user_prompt_template": (
                 "Context:\n{context}\n\n"
                 "Question:\n{question}\n\n"
-                "Return the final answer only. Preserve exact digits, capitalization, and spelling when relevant."
+                "Return the final answer only. Preserve exact digits, capitalization, and spelling when relevant. "
+                "If multiple evidence values are required, use only values that are explicitly present in the context."
             ),
         }
 
@@ -72,7 +76,11 @@ class HybridRetrievalAgent(ModelProvider):
             messages=messages,
             enable_thinking=getattr(self, "enable_thinking", False),
         )
-        self.last_trace = {"agent": self.__class__.__name__, "path": "hybrid_retrieval"}
+        self.last_trace = {
+            "agent": self.__class__.__name__,
+            "path": "hybrid_retrieval",
+            **self._last_retrieval_trace,
+        }
         return self.finalize_answer(response_raw.strip())
 
     def _select_context(self, prompt: Dict, question: str) -> str:
@@ -83,9 +91,20 @@ class HybridRetrievalAgent(ModelProvider):
 
         full_context = self._build_full_context(context_data)
         if int(full_context["total_tokens"]) <= self.full_context_threshold_tokens:
+            self._last_retrieval_trace = {
+                "retrieval_mode": "full_context",
+            "context_chars": len(str(full_context["text"])),
+            "selected_queries": [question],
+            "evidence_block_count": len(context_data.get("files", []) or []),
+            "retrieved_files": [file_data.get("filename", "") for file_data in context_data.get("files", []) or []],
+            "embedding_model": self.embedding_model,
+            "rerank_model": self.rerank_model,
+        }
             return str(full_context["text"])
 
-        return self._retrieve_with_hybrid(question, context_data)["evidence_text"]
+        retrieval = self._retrieve_with_hybrid(question, context_data, queries=self._build_retrieval_queries(question))
+        self._last_retrieval_trace = retrieval.get("trace", {})
+        return retrieval["evidence_text"]
 
     def _build_full_context(self, context_data: Dict) -> Dict[str, Union[str, int]]:
         files = context_data.get("files", []) or []
@@ -98,7 +117,7 @@ class HybridRetrievalAgent(ModelProvider):
             total_tokens += len(self.encode_text_to_tokens(text))
         return {"text": "\n\n".join(parts), "total_tokens": total_tokens}
 
-    def _retrieve_with_hybrid(self, question: str, context_data: Dict, queries: Optional[List[str]] = None) -> Dict[str, str]:
+    def _retrieve_with_hybrid(self, question: str, context_data: Dict, queries: Optional[List[str]] = None) -> Dict[str, Union[str, Dict]]:
         files = context_data.get("files", []) or []
         chunks: List[Dict] = []
         for doc_id, file_data in enumerate(files):
@@ -106,9 +125,19 @@ class HybridRetrievalAgent(ModelProvider):
             filename = file_data.get("filename", f"doc_{doc_id}")
             chunks.extend(self._chunk_document(content, filename, doc_id))
         if not chunks:
-            return {"evidence_text": "No relevant content found."}
+            return {
+                "evidence_text": "No relevant content found.",
+                "trace": {
+                    "retrieval_mode": "hybrid",
+                    "selected_queries": queries or [question],
+                    "evidence_block_count": 0,
+                    "retrieved_files": [],
+                    "rerank_scores": [],
+                    "context_chars": 0,
+                },
+            }
 
-        search_queries = queries or [question]
+        search_queries = queries or self._build_retrieval_queries(question)
         bm25_indices = set()
         vector_indices = set()
         for query in search_queries:
@@ -142,22 +171,28 @@ class HybridRetrievalAgent(ModelProvider):
         if not rerank_inputs:
             return {"evidence_text": "No relevant content found."}
 
-        reranked = self._rerank_documents(question, rerank_inputs, top_n=self.rerank_top_n * 2)
+        target_blocks = self._dynamic_rerank_top_n(question)
+        neighbor_radius = self._dynamic_neighbor_radius(question)
+        reranked = self._rerank_documents(question, rerank_inputs, top_n=target_blocks * 2)
         threshold = (max((r.get("relevance_score", 0) for r in reranked), default=0) or 0) * 0.12
 
         evidence_blocks: List[str] = []
         total_tokens = 0
         added = set()
+        retrieved_files = []
+        rerank_scores = []
         for rank_idx, result in enumerate(reranked):
             score = result.get("relevance_score", 0)
             if score < threshold and len(evidence_blocks) >= 3:
                 break
-            if len(evidence_blocks) >= self.rerank_top_n:
+            if len(evidence_blocks) >= target_blocks:
                 break
 
             snippet = result.get("document", "")
             orig_idx = chunk_map.get(snippet)
-            for idx in self._with_neighbors(orig_idx, chunks) if orig_idx is not None else []:
+            if orig_idx is not None:
+                rerank_scores.append(round(float(score or 0), 4))
+            for idx in self._with_neighbors(orig_idx, chunks, radius=neighbor_radius) if orig_idx is not None else []:
                 if idx in added:
                     continue
                 chunk = chunks[idx]
@@ -169,15 +204,92 @@ class HybridRetrievalAgent(ModelProvider):
                 evidence_blocks.append(block)
                 total_tokens += block_tokens
                 added.add(idx)
+                retrieved_files.append(str(chunk["filename"]))
 
-        return {"evidence_text": "\n\n---\n\n".join(evidence_blocks) if evidence_blocks else "No relevant content found."}
+        evidence_text = "\n\n---\n\n".join(evidence_blocks) if evidence_blocks else "No relevant content found."
+        return {
+            "evidence_text": evidence_text,
+            "trace": {
+                "retrieval_mode": "hybrid",
+            "selected_queries": search_queries,
+            "evidence_block_count": len(evidence_blocks),
+            "retrieved_files": list(dict.fromkeys(retrieved_files)),
+            "rerank_scores": rerank_scores[:target_blocks],
+            "context_chars": len(evidence_text),
+            "neighbor_radius": neighbor_radius,
+            "target_evidence_blocks": target_blocks,
+            "embedding_model": self.embedding_model,
+            "rerank_model": self.rerank_model,
+        },
+    }
 
-    def _with_neighbors(self, idx: int, chunks: List[Dict]) -> List[int]:
+    def _with_neighbors(self, idx: int, chunks: List[Dict], radius: int = 1) -> List[int]:
         result = [idx]
-        for neighbor_idx in (idx - 1, idx + 1):
-            if 0 <= neighbor_idx < len(chunks) and chunks[neighbor_idx]["doc_id"] == chunks[idx]["doc_id"]:
-                result.append(neighbor_idx)
+        for offset in range(1, radius + 1):
+            for neighbor_idx in (idx - offset, idx + offset):
+                if 0 <= neighbor_idx < len(chunks) and chunks[neighbor_idx]["doc_id"] == chunks[idx]["doc_id"]:
+                    result.append(neighbor_idx)
         return result
+
+    def _build_retrieval_queries(self, question: str) -> List[str]:
+        queries = [question]
+        queries.extend(re.findall(r"\[([A-Za-z0-9_-]{3,120})\]", question))
+        queries.extend(re.findall(r"['\"]([^'\"]{3,100})['\"]", question))
+        queries.extend(re.findall(r"\b[A-Z][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+\b", question))
+        queries.extend(re.findall(r"\b[A-Z][A-Z0-9_]{5,}\b", question))
+        queries.extend(re.findall(r"\b[A-Za-z]+[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*\b", question))
+        queries.extend(self._capitalized_phrases(question))
+
+        if self._looks_multi_evidence(question):
+            queries.extend(self._operation_queries(question))
+
+        ordered: List[str] = []
+        seen = set()
+        for query in queries:
+            clean = query.strip(" .,:;")
+            if clean and clean.lower() not in seen:
+                ordered.append(clean)
+                seen.add(clean.lower())
+        return ordered[:8]
+
+    def _capitalized_phrases(self, question: str) -> List[str]:
+        phrases = re.findall(r"\b(?:[A-Z][a-zA-Z0-9_-]+(?:\s+|$)){2,5}", question)
+        cleaned = []
+        for phrase in phrases:
+            phrase = re.sub(r"^(For|Using|Based|According|During|In|From)\s+", "", phrase.strip())
+            if len(phrase) >= 6:
+                cleaned.append(phrase)
+        return cleaned
+
+    def _operation_queries(self, question: str) -> List[str]:
+        q = question.lower()
+        queries = []
+        if any(term in q for term in ("difference", "subtract", "minus")):
+            queries.append("difference subtract minus")
+        if any(term in q for term in ("multiply", "multiplier", "product")):
+            queries.append("multiplier product")
+        if any(term in q for term in ("divide", "division", "divisor", "ratio", "quotient")):
+            queries.append("divisor quotient")
+        if any(term in q for term in ("date", "days", "weekday", "launch", "deadline")):
+            queries.append("date scheduled launch deadline")
+        if any(term in q for term in ("encoded", "decode", "cipher", "base64", "hex")):
+            queries.append("encoded string payload method")
+        return queries
+
+    def _looks_multi_evidence(self, question: str) -> bool:
+        q = question.lower()
+        connectors = len(re.findall(r"\b(and|then|finally|between|from|minus|divided by|multiplied by)\b", q))
+        operations = len(re.findall(r"\b(subtract|minus|multiply|multiplied|divide|divided|difference|product|divisor)\b", q))
+        quoted_or_ids = len(re.findall(r"['\"][^'\"]+['\"]|\b[A-Z0-9]+-[A-Z0-9-]+\b", question))
+        return connectors >= 2 or operations >= 2 or quoted_or_ids >= 2
+
+    def _dynamic_rerank_top_n(self, question: str) -> int:
+        if self._looks_multi_evidence(question):
+            return min(self.rerank_top_n + 4, 14)
+        return self.rerank_top_n
+
+    def _dynamic_neighbor_radius(self, question: str) -> int:
+        return 2 if self._looks_multi_evidence(question) else 1
 
     def _chunk_document(self, content: str, filename: str, doc_id: int) -> List[Dict]:
         tokens = self.encode_text_to_tokens(content)
