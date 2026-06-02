@@ -14,7 +14,7 @@ uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent
 uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --num_samples 5 --num_tests 1
 uv run python run.py --agent agents.hybrid_retrieval_agent:HybridRetrievalAgent
 uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --test_mode single
-uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
+uv run python generate_report.py --input results/latest_ToolAugmentedAgent_evaluation_data.json
 ```
 
 ## Agent Architecture
@@ -34,7 +34,7 @@ ModelProvider
 
 ## Reporting
 
-Evaluations write `results/latest_evaluation_data.json` and generate `results/evaluation_report.html`. Report text analysis uses DeepSeek, while evaluation and retrieval use ECNU APIs.
+Evaluations write the latest structured data and HTML report per agent, for example `results/latest_ToolAugmentedAgent_evaluation_data.json` and `results/ToolAugmentedAgent_evaluation_report.html`. Report text analysis uses DeepSeek with the tested agent's profile in the analysis prompt, while evaluation and retrieval use ECNU APIs.
 
 ## Integrity Constraints
 

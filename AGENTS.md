@@ -37,7 +37,7 @@ uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --te
 uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --enable_thinking True
 
 # Regenerate HTML report from latest structured data
-uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
+uv run python generate_report.py --input results/latest_ToolAugmentedAgent_evaluation_data.json
 ```
 
 ## Architecture
@@ -62,7 +62,7 @@ ModelProvider
 
 ## Reporting
 
-Each evaluation writes `results/latest_evaluation_data.json`, overwriting the previous snapshot. The default reporter renders `results/evaluation_report.html` and uses `deepseek-v4-pro` only for the product-analysis text.
+Each evaluation writes the latest structured data and HTML report per agent, for example `results/latest_ToolAugmentedAgent_evaluation_data.json` and `results/ToolAugmentedAgent_evaluation_report.html`. The default reporter uses `deepseek-v4-pro` only for the product-analysis text, and its analysis prompt includes the tested agent's profile so attribution and suggestions match that agent's design.
 
 ## Model Configuration
 

@@ -7,6 +7,7 @@ from core.config import CommandArgs
 from core.ecnu_constants import DEFAULT_ECNU_BASE_URL
 from core.evaluation_data import build_evaluation_data, save_latest_evaluation_data
 from core.health_check import check_models
+from core.report_paths import resolve_report_paths
 from core.reporter_factory import load_reporter
 from core.runner import run_single_test_case
 from core.test_case_loader import get_needles, load_test_cases, sample_test_cases
@@ -24,6 +25,11 @@ def _project_path(path: str) -> str:
 def main():
     """命令行入口。"""
     args = CLI(CommandArgs, as_positional=False)
+    report_data_path, report_output_path = resolve_report_paths(
+        args.agent,
+        args.report_data_path,
+        args.report_output_path,
+    )
 
     api_key = args.api_key or os.getenv("ECNU_API_KEY")
     base_url = args.base_url or os.getenv("ECNU_BASE_URL", DEFAULT_ECNU_BASE_URL)
@@ -136,14 +142,14 @@ def main():
 
     if all_results:
         evaluation_data = build_evaluation_data(all_results, test_case_summaries, args)
-        data_path = save_latest_evaluation_data(evaluation_data, _project_path(args.report_data_path))
+        data_path = save_latest_evaluation_data(evaluation_data, _project_path(report_data_path))
         print("\nStructured evaluation data saved to:")
         print(f"  {data_path}")
 
     if args.generate_report and all_results:
         reporter_class = load_reporter(args.reporter)
         reporter = reporter_class()
-        report_path = reporter.generate(evaluation_data, _project_path(args.report_output_path))
+        report_path = reporter.generate(evaluation_data, _project_path(report_output_path))
         if report_path:
             print("\nEvaluation report saved to:")
             print(f"  {report_path}")

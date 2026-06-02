@@ -45,10 +45,10 @@
 
 报告会输出：
 
-- `results/latest_evaluation_data.json`：最近一次结构化评测数据，只保留一份
-- `results/evaluation_report.html`：纯 HTML 数据看板与 AI 分析报告
+- `results/latest_<Agent>_evaluation_data.json`：该 Agent 最近一次结构化评测数据
+- `results/<Agent>_evaluation_report.html`：该 Agent 最近一次纯 HTML 数据看板与 AI 分析报告
 
-HTML 报告基于结构化数据展示总览指标、类型表现、分数分布、single 模式热力表、bad case 表和工具链诊断。报告分析文本由 `deepseek-v4-pro` 基于结构化数据生成，不依赖图片或多模态读图。
+HTML 报告基于结构化数据展示总览指标、类型表现、分数分布、single 模式热力表、bad case 表和工具链诊断。报告分析文本由 `deepseek-v4-pro` 基于结构化数据和被测 Agent 的 profile 生成，不依赖图片或多模态读图。
 
 ## 项目结构
 
@@ -154,7 +154,7 @@ uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --en
 不重新跑评测，直接使用最近一次结构化数据生成报告。
 
 ```bash
-uv run python generate_report.py --input results/latest_evaluation_data.json --output results/evaluation_report.html
+uv run python generate_report.py --input results/latest_ToolAugmentedAgent_evaluation_data.json
 ```
 
 #### 关闭报告生成

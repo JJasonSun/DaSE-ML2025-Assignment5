@@ -38,5 +38,5 @@ class CommandArgs:
     print_ongoing_status: Optional[bool] = True
     generate_report: Optional[bool] = True
     reporter: Optional[str] = "reporters.deepseek_html_reporter:DeepSeekHtmlReporter"
-    report_data_path: Optional[str] = "results/latest_evaluation_data.json"
-    report_output_path: Optional[str] = "results/evaluation_report.html"
+    report_data_path: Optional[str] = None  # 默认 results/latest_<Agent>_evaluation_data.json
+    report_output_path: Optional[str] = None  # 默认 results/<Agent>_evaluation_report.html

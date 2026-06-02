@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
+from core.agent_profiles import agent_profile_for
 from reporters.base_reporter import BaseReporter
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
@@ -81,12 +82,14 @@ class DeepSeekHtmlReporter(BaseReporter):
         client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         mode = str(metrics.get("test_mode", data.get("config", {}).get("test_mode", "unknown"))).lower()
         mode_focus = self._analysis_focus_for_mode(mode)
+        agent_profile = agent_profile_for(str(metrics.get("agent", data.get("config", {}).get("agent", "unknown"))))
         system = (
             "You are a rigorous AI product evaluation analyst. "
             "You only write the narrative analysis section for an evaluation dashboard. "
             "Do not output HTML, XML, CSS, JavaScript, code blocks, or full web page structures. "
             "Output plain Markdown only. Write the content in Simplified Chinese. "
             "All claims must be grounded in the provided structured metrics, bad cases, and tool diagnostics. "
+            "Use the provided agent context to tailor attribution and optimization suggestions. "
             "Do not invent missing data."
         )
         user = f"""
@@ -106,8 +109,13 @@ Output constraints:
 - No fenced code blocks.
 - Do not say "below is the HTML/code".
 - Do not invent model comparisons, user behavior, business outcomes, or unsupported causes.
+- Tailor attribution and suggestions to the tested agent's design. Do not recommend tooling that the agent
+  already has unless the metrics show that the implementation or coverage is failing.
 - Use tool diagnostics to explain whether failures are more likely caused by retrieval, structured extraction,
   tool execution, fallback paths, or answer formatting.
+
+Agent context:
+{agent_profile}
 
 Mode-specific analysis focus:
 {mode_focus}
