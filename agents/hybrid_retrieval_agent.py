@@ -19,6 +19,13 @@ from .base_agent import ModelProvider
 class HybridRetrievalAgent(ModelProvider):
     """Hybrid retrieval baseline: BM25 + dense embedding + rerank + neighbor chunks."""
 
+    AGENT_PROFILE = {
+        "positioning": "Retrieval-augmented baseline using BM25, ECNU dense embeddings, ECNU rerank, generic query expansion, dynamic neighbor chunk expansion, and retrieval trace metadata before final LLM answering.",
+        "expected_strengths": "Designed for fairer multi-document evidence recall, better identifier/query coverage, and retrieval diagnostics without adding deterministic tools.",
+        "expected_limits": "Still intentionally relies on the LLM for exact arithmetic, date reasoning, string operations, encoding, and final answer formatting; it should remain a retrieval baseline rather than a weak ToolAugmentedAgent.",
+        "analysis_focus": "Separate retrieval failures from post-retrieval reasoning or formatting failures. Use retrieval trace fields such as selected_queries, retrieved_files, rerank_scores, evidence_block_count, and neighbor_radius. Suggestions should target query expansion, rerank, chunking, context selection, and final-answer prompting, not calculators or decoders.",
+    }
+
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         load_dotenv()
         api_key = api_key or os.getenv("ECNU_API_KEY") or ""

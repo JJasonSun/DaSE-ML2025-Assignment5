@@ -12,6 +12,13 @@ class BaselineAgent(ModelProvider):
     Use it as a control group, not as the recommended evaluation agent.
     """
 
+    AGENT_PROFILE = {
+        "positioning": "Minimal control group. It uses a simple context window and does not perform hybrid retrieval or deterministic tool execution.",
+        "expected_strengths": "Useful as a lower-bound baseline for checking whether the evaluation pipeline and prompt format are working.",
+        "expected_limits": "Likely to miss deeply buried evidence, multi-document evidence joins, and exact computation-heavy tasks.",
+        "analysis_focus": "Treat failures mainly as baseline capability gaps unless metrics show answer formatting or evaluator issues.",
+    }
+
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         api_key = api_key or os.getenv("ECNU_API_KEY") or ""
         base_url = (base_url or os.getenv("ECNU_BASE_URL") or DEFAULT_ECNU_BASE_URL).rstrip("/")

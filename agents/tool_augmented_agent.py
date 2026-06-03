@@ -19,6 +19,12 @@ class ToolAugmentedAgent(HybridRetrievalAgent):
     """
 
     SUPPORTED_TASKS = {"computation", "date_time", "string_analysis", "encoding"}
+    AGENT_PROFILE = {
+        "positioning": "Planner-first tool-augmented agent combining hybrid retrieval, LLM operation planning, deterministic Python execution, one-shot replanning on tool failure, validation, and trace metadata.",
+        "expected_strengths": "Designed to let the LLM handle semantic field mapping and operation planning while Python handles exact arithmetic, date reasoning, string analysis, hashing, and encoding/decoding.",
+        "expected_limits": "Quality depends on retrieved evidence completeness, LLM plan quality, validation coverage, operation parsing, deterministic tool coverage, and answer normalization.",
+        "analysis_focus": "Use planner and tool diagnostics heavily. Attribute failures to retrieval completeness, operation_plan quality, validation_result, deterministic execution, replanning behavior, or answer normalization only when supported by traces and metrics. Do not recommend adding more case-specific hardcoded rules unless the data clearly shows a reusable missing tool primitive.",
+    }
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         super().__init__(api_key=api_key, base_url=base_url)
