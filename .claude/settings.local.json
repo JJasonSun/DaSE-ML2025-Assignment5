@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(uv run python -c ' *)",
+      "Bash(uv run *)",
+      "Bash(python -m py_compile agents/base_agent.py)",
+      "Bash(python -m py_compile agents/agent_plus.py)",
+      "Bash(python -m py_compile agents/sync_agent.py)",
+      "Bash(python -m py_compile agents/scenario_agent.py)",
+      "Bash(python -m py_compile agents/agent_template.py)"
+    ]
+  }
+}

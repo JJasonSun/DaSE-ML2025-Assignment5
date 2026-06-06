@@ -18,7 +18,6 @@ dist/
 *.egg-info/
 
 # Project outputs
-results/
 contexts/
 *.log
 
@@ -36,7 +35,3 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
-
-.claude
-
-docs/

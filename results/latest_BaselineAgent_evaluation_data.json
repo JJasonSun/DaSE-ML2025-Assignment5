@@ -1,0 +1,2544 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-02 15:18:23",
+  "config": {
+    "agent": "agents.baseline_agent:BaselineAgent",
+    "test_mode": "multi",
+    "evaluator_type": "llm",
+    "num_samples": 20,
+    "num_tests": 3,
+    "enable_thinking": false
+  },
+  "metrics": {
+    "model": "ecnu-max",
+    "report_model": null,
+    "agent": "agents.baseline_agent:BaselineAgent",
+    "test_mode": "multi",
+    "evaluator_type": "llm",
+    "num_samples": 20,
+    "num_tests": 3,
+    "enable_thinking": false,
+    "total_runs": 60,
+    "total_cases": 20,
+    "mean_score": 0.67,
+    "min_score": 0.0,
+    "max_score": 10.0,
+    "outcome_counts": {
+      "Good": 4,
+      "Partial": 0,
+      "Fail": 56
+    },
+    "by_type": {
+      "computation": {
+        "count": 15,
+        "mean_score": 0.0,
+        "bad_cases": 15,
+        "good_cases": 0
+      },
+      "date_time": {
+        "count": 15,
+        "mean_score": 0.67,
+        "bad_cases": 14,
+        "good_cases": 1
+      },
+      "encoding": {
+        "count": 15,
+        "mean_score": 2.0,
+        "bad_cases": 12,
+        "good_cases": 3
+      },
+      "string_analysis": {
+        "count": 15,
+        "mean_score": 0.0,
+        "bad_cases": 15,
+        "good_cases": 0
+      }
+    },
+    "bad_examples": [
+      {
+        "test_case_id": 782,
+        "type": "computation",
+        "score": 0,
+        "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime...",
+        "ground_truth": "1018330454172374",
+        "response": "I'm sorry, but I cannot answer this question as it is not related to the provided context. The context discusses the concept of good taste in art and makes no mention of grains of sand, stars, or a..."
+      },
+      {
+        "test_case_id": 782,
+        "type": "computation",
+        "score": 0,
+        "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime...",
+        "ground_truth": "1018330454172374",
+        "response": "I don't know"
+      },
+      {
+        "test_case_id": 782,
+        "type": "computation",
+        "score": 0,
+        "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime...",
+        "ground_truth": "1018330454172374",
+        "response": "37"
+      },
+      {
+        "test_case_id": 123,
+        "type": "date_time",
+        "score": 0,
+        "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the sche...",
+        "ground_truth": "59",
+        "response": "I do not have enough information from the context to answer this question. It discusses detecting bias in selection processes, not Project Chimera, the Aethelred Protocol, or the date 2052-12-17"
+      },
+      {
+        "test_case_id": 123,
+        "type": "date_time",
+        "score": 0,
+        "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the sche...",
+        "ground_truth": "59",
+        "response": "I cannot find the term \"Project Chimera\" or \"Aethelred Protocol\" in the provided context, so I cannot answer the question"
+      },
+      {
+        "test_case_id": 123,
+        "type": "date_time",
+        "score": 0,
+        "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the sche...",
+        "ground_truth": "59",
+        "response": "I cannot answer the question as the provided context does not mention \"Project Chimera\", the \"Aethelred Protocol\", or any specific deployment date"
+      },
+      {
+        "test_case_id": 1555,
+        "type": "encoding",
+        "score": 0,
+        "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operati...",
+        "ground_truth": "DELTA961",
+        "response": "I am unable to answer the question"
+      },
+      {
+        "test_case_id": 1555,
+        "type": "encoding",
+        "score": 0,
+        "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operati...",
+        "ground_truth": "DELTA961",
+        "response": "I can only answer based on the provided context. The context does not contain any information about \"Agent Whisper\", \"NOVDK961\", cipher protocols, operation code names, or squadron numbers. Therefo..."
+      },
+      {
+        "test_case_id": 1555,
+        "type": "encoding",
+        "score": 0,
+        "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operati...",
+        "ground_truth": "DELTA961",
+        "response": "Agent 7, NOVDK9"
+      },
+      {
+        "test_case_id": 1005,
+        "type": "string_analysis",
+        "score": 0,
+        "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character freque...",
+        "ground_truth": "7",
+        "response": "I cannot answer this question"
+      },
+      {
+        "test_case_id": 1005,
+        "type": "string_analysis",
+        "score": 0,
+        "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character freque...",
+        "ground_truth": "7",
+        "response": "I cannot answer this question"
+      },
+      {
+        "test_case_id": 1005,
+        "type": "string_analysis",
+        "score": 0,
+        "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character freque...",
+        "ground_truth": "7",
+        "response": "I cannot determine the number of times 'e' appears"
+      }
+    ],
+    "tool_diagnostics": {
+      "path_counts": {
+        "unknown": 60
+      },
+      "fallback_counts": {},
+      "task_counts": {
+        "unknown": 60
+      }
+    },
+    "multi_mode": {
+      "avg_needle_depth": 47.14,
+      "min_needle_depth": 0.0,
+      "max_needle_depth": 98.78
+    },
+    "per_run_scores": [
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 782
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 782
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 782
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 123
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 123
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 123
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1555
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1555
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1555
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1005
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1005
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1005
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1146
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1146
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 1146
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 15
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 15
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 15
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1245
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1245
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1245
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 126
+      },
+      {
+        "label": "2",
+        "score": 10.0,
+        "type": "date_time",
+        "case_id": 126
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 126
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 994
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 994
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 994
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 868
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 868
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 868
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 745
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 745
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 745
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 922
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 922
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "string_analysis",
+        "case_id": 922
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 774
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 774
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 774
+      },
+      {
+        "label": "1",
+        "score": 10.0,
+        "type": "encoding",
+        "case_id": 1405
+      },
+      {
+        "label": "2",
+        "score": 10.0,
+        "type": "encoding",
+        "case_id": 1405
+      },
+      {
+        "label": "3",
+        "score": 10.0,
+        "type": "encoding",
+        "case_id": 1405
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1563
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1563
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1563
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 440
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 440
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 440
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 118
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 118
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 118
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 569
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 569
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "computation",
+        "case_id": 569
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 398
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 398
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "date_time",
+        "case_id": 398
+      },
+      {
+        "label": "1",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1592
+      },
+      {
+        "label": "2",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1592
+      },
+      {
+        "label": "3",
+        "score": 0.0,
+        "type": "encoding",
+        "case_id": 1592
+      }
+    ]
+  },
+  "summaries": [
+    {
+      "test_case_id": 782,
+      "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap betwee",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 123,
+      "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this de",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1555,
+      "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence a",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1005,
+      "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1146,
+      "question": "Using the cryptographic entropy validation string associated with Configuration ID A7B9-STRING-2024-",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 15,
+      "question": "Based on the Project Quantum Phoenix (QPX-8812) timeline, what day of the week will the final deploy",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1245,
+      "question": "Agent, we've intercepted a secure communication with ID TITAN_310_MSG_001. The field agent's status ",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 126,
+      "question": "According to the Artemis Foundation's timeline for project 'Nova-Seraph-7', what day of the week wil",
+      "num_runs": 3,
+      "mean_score": 3.3333333333333335,
+      "max_score": 10,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 994,
+      "question": "For the experimental quantum-resistant protocol payload identified by TAC-RD-2024-EXPERIMENT-ALPHA-0",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 868,
+      "question": "Using the QEKEP-v3.2 verification hash from the quantum key exchange between satellite QSAT-7 and gr",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 745,
+      "question": "To unlock the central data archive, you must calculate the 8-digit access code derived from the mast",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 922,
+      "question": "For the secure transaction authorization code identified as TXN-ALPHA-7B, calculate the first 8 char",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 774,
+      "question": "To activate the Chronos Gateway, engineers must calculate the precise energy signature. First, deter",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1405,
+      "question": "Based on the intercepted communication protocol details, what is the original classified satellite d",
+      "num_runs": 3,
+      "mean_score": 10.0,
+      "max_score": 10,
+      "min_score": 10
+    },
+    {
+      "test_case_id": 1563,
+      "question": "Agent, we've intercepted an encoded message with the unique identifier DragonFire-77. Using the clue",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 440,
+      "question": "During the Galactic Resource Summit, Administrator Kael needs to determine the maximum number of aid",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 118,
+      "question": "Based on the schedule for Project Chimera-X's final temporal calibration under Dr. Aris Thorne, what",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 569,
+      "question": "In the 'Galactic Logistics' scenario, the warehouse 'Omega Prime' has a specific product with an inv",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 398,
+      "question": "Based on the details for 'Operation Hydra-Gamma-7X', on what day of the week will the main pre-launc",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    },
+    {
+      "test_case_id": 1592,
+      "question": "Using information from the intercepted transmission about the encoding method and the specific proto",
+      "num_runs": 3,
+      "mean_score": 0.0,
+      "max_score": 0,
+      "min_score": 0
+    }
+  ],
+  "results": [
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+        "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+          "filename": "aord.txt",
+          "depth_percent": 66.8372569089048
+        },
+        {
+          "needle": "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice.",
+          "filename": "langdes.txt",
+          "depth_percent": 62.113127001067234
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I'm sorry, but I cannot answer this question as it is not related to the provided context. The context discusses the concept of good taste in art and makes no mention of grains of sand, stars, or any such calculations",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.1030821800231934,
+      "test_timestamp_utc": "2026-06-02 07:16:36+0000",
+      "test_case_id": 782,
+      "test_case_type": "computation",
+      "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime Significance) and the stars visible at winter solstice (Sunstone Altar prophecy). What is this precise difference?",
+      "ground_truth": "1018330454172374"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+        "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+          "filename": "goodtaste.txt",
+          "depth_percent": 20.15725518227305
+        },
+        {
+          "needle": "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice.",
+          "filename": "hubs.txt",
+          "depth_percent": 69.97858672376873
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I don't know",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.42202162742614746,
+      "test_timestamp_utc": "2026-06-02 07:16:38+0000",
+      "test_case_id": 782,
+      "test_case_type": "computation",
+      "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime Significance) and the stars visible at winter solstice (Sunstone Altar prophecy). What is this precise difference?",
+      "ground_truth": "1018330454172374"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+        "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The prophecy inscribed on the Sunstone Altar states the number 2858176846513565, which is the count of stars visible from the observatory peak during the winter solstice.",
+          "filename": "island.txt",
+          "depth_percent": 6.747230614300101
+        },
+        {
+          "needle": "In the ancient temple of mathematical mysteries, the Orb of Prime Significance holds the value 1839846392341191, representing the total grains of sand in the sacred northern sand garden.",
+          "filename": "pow.txt",
+          "depth_percent": 45.16129032258064
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "37",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.24232816696166992,
+      "test_timestamp_utc": "2026-06-02 07:16:38+0000",
+      "test_case_id": 782,
+      "test_case_type": "computation",
+      "question": "To unlock the Chamber of Absolute Difference, the High Priest must calculate the absolute gap between the grains of sand in the northern garden (Orb of Prime Significance) and the stars visible at winter solstice (Sunstone Altar prophecy). What is this precise difference?",
+      "ground_truth": "1018330454172374"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+        "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+          "filename": "addiction.txt",
+          "depth_percent": 66.70616113744076
+        },
+        {
+          "needle": "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision.",
+          "filename": "iflisp.txt",
+          "depth_percent": 12.105263157894736
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I do not have enough information from the context to answer this question. It discusses detecting bias in selection processes, not Project Chimera, the Aethelred Protocol, or the date 2052-12-17",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.7220714092254639,
+      "test_timestamp_utc": "2026-06-02 07:16:44+0000",
+      "test_case_id": 123,
+      "test_case_type": "date_time",
+      "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the scheduled system-wide audit on 2052-12-17?",
+      "ground_truth": "59"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+        "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision.",
+          "filename": "founders.txt",
+          "depth_percent": 81.96872125114996
+        },
+        {
+          "needle": "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+          "filename": "laundry.txt",
+          "depth_percent": 98.78456931477893
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot find the term \"Project Chimera\" or \"Aethelred Protocol\" in the provided context, so I cannot answer the question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7754614353179932,
+      "test_timestamp_utc": "2026-06-02 07:16:46+0000",
+      "test_case_id": 123,
+      "test_case_type": "date_time",
+      "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the scheduled system-wide audit on 2052-12-17?",
+      "ground_truth": "59"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+        "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Project Chimera, code-named 'Aethelred Protocol', is scheduled for final deployment on 2052-10-19. All systems must be synchronized to this timeline.",
+          "filename": "desres.txt",
+          "depth_percent": 42.45531790213888
+        },
+        {
+          "needle": "The Aethelred Protocol involves quantum entanglement synchronization across all regional hubs, requiring absolute temporal precision.",
+          "filename": "foundervisa.txt",
+          "depth_percent": 47.63860369609856
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer the question as the provided context does not mention \"Project Chimera\", the \"Aethelred Protocol\", or any specific deployment date",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7903552055358887,
+      "test_timestamp_utc": "2026-06-02 07:16:47+0000",
+      "test_case_id": 123,
+      "test_case_type": "date_time",
+      "question": "Project Chimera's 'Aethelred Protocol' has its final deployment on a specific date. Based on this deployment timeline, how many days are there until the scheduled system-wide audit on 2052-12-17?",
+      "ground_truth": "59"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+        "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+          "filename": "before.txt",
+          "depth_percent": 64.42567567567568
+        },
+        {
+          "needle": "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers.",
+          "filename": "copy.txt",
+          "depth_percent": 68.22875297855441
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I am unable to answer the question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 5.846458911895752,
+      "test_timestamp_utc": "2026-06-02 07:16:53+0000",
+      "test_case_id": 1555,
+      "test_case_type": "encoding",
+      "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operation code name and squadron number hidden in this message?",
+      "ground_truth": "DELTA961"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+        "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+          "filename": "laundry.txt",
+          "depth_percent": 88.93781927074158
+        },
+        {
+          "needle": "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers.",
+          "filename": "love.txt",
+          "depth_percent": 90.1980198019802
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I can only answer based on the provided context. The context does not contain any information about \"Agent Whisper\", \"NOVDK961\", cipher protocols, operation code names, or squadron numbers. Therefore, I cannot provide an answer",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.2895762920379639,
+      "test_timestamp_utc": "2026-06-02 07:16:55+0000",
+      "test_case_id": 1555,
+      "test_case_type": "encoding",
+      "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operation code name and squadron number hidden in this message?",
+      "ground_truth": "DELTA961"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+        "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Our technical analysis of enemy cipher patterns shows they consistently apply the same positional shift to each letter while preserving numbers. All decoded messages from this network have shown military operation code names followed by squadron numbers.",
+          "filename": "island.txt",
+          "depth_percent": 11.782477341389729
+        },
+        {
+          "needle": "The latest intelligence report confirms that enemy communications are using a modified classic cipher system. Their agents rotate their alphabet by exactly 10 positions for all transmissions. Remember to check for numerical suffixes that remain unchanged. The transmission intercepted from Agent Whisper contained the identifier NOVDK961.",
+          "filename": "want.txt",
+          "depth_percent": 50.540958268933544
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "Agent 7, NOVDK9",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.6125891208648682,
+      "test_timestamp_utc": "2026-06-02 07:16:56+0000",
+      "test_case_id": 1555,
+      "test_case_type": "encoding",
+      "question": "Agent Whisper's transmission has been intercepted with identifier NOVDK961. Using our intelligence about enemy cipher protocols, what is the original operation code name and squadron number hidden in this message?",
+      "ground_truth": "DELTA961"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe"
+      ],
+      "needle_locations": [
+        {
+          "needle": "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe",
+          "filename": "philosophy.txt",
+          "depth_percent": 34.36317780580075
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.0787577629089355,
+      "test_timestamp_utc": "2026-06-02 07:16:57+0000",
+      "test_case_id": 1005,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character frequency analysis to determine how many times the character 'e' appears in the complete key string.",
+      "ground_truth": "7"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe"
+      ],
+      "needle_locations": [
+        {
+          "needle": "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe",
+          "filename": "todo.txt",
+          "depth_percent": 60.19417475728155
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.905170202255249,
+      "test_timestamp_utc": "2026-06-02 07:16:58+0000",
+      "test_case_id": 1005,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character frequency analysis to determine how many times the character 'e' appears in the complete key string.",
+      "ground_truth": "7"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe"
+      ],
+      "needle_locations": [
+        {
+          "needle": "This is the complete digital signature verification key for the QNX-7B satellite's telemetry system (ID: SIG-QNX7B-TELEMETRY-2024): aB2AA8eD5E3EBFfc95b27B8AfBACDD5D26AB708C3694bd51dC29B52b6b7D2bd1d6Ee584E95dBc92649bbB08Fe5Fd1B7bb1AC78d7AFEDf5e02A0b49bf6E9DD8bCc7ba8568be3fBcCe8dD3d6dB243d93f0Ed5Bbe",
+          "filename": "gh.txt",
+          "depth_percent": 60.62773722627737
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot determine the number of times 'e' appears",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.2392148971557617,
+      "test_timestamp_utc": "2026-06-02 07:17:00+0000",
+      "test_case_id": 1005,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic signature key designated for the QNX-7B satellite's telemetry verification (ID: SIG-QNX7B-TELEMETRY-2024), perform a character frequency analysis to determine how many times the character 'e' appears in the complete key string.",
+      "ground_truth": "7"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis.",
+          "filename": "popular.txt",
+          "depth_percent": 12.50262219425215
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "0",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.30049562454223633,
+      "test_timestamp_utc": "2026-06-02 07:17:00+0000",
+      "test_case_id": 1146,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic entropy validation string associated with Configuration ID A7B9-STRING-2024-01, calculate the absolute difference between the total occurrences of the character 'F' and the character '3' in the complete hexadecimal sequence.",
+      "ground_truth": "1"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis.",
+          "filename": "goodtaste.txt",
+          "depth_percent": 84.63187991422446
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "0",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.26874685287475586,
+      "test_timestamp_utc": "2026-06-02 07:17:01+0000",
+      "test_case_id": 1146,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic entropy validation string associated with Configuration ID A7B9-STRING-2024-01, calculate the absolute difference between the total occurrences of the character 'F' and the character '3' in the complete hexadecimal sequence.",
+      "ground_truth": "1"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Configuration ID: A7B9-STRING-2024-01\nPurpose: Cryptographic entropy validation\nSource: Hardware RNG module calibration test\nComplete String: d3B8C6dA6b28b2Bb6cB209afE0AD2Afe2EfbEcFFBc2EEa5fc72C1C37e82b7caACD15b4d6E44bCD7AdDB625b55528eDb2F17726b84fd72c97\nThis string contains only hexadecimal characters and is used exclusively for entropy distribution analysis.",
+          "filename": "superangels.txt",
+          "depth_percent": 7.701889142619887
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "2",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.228771448135376,
+      "test_timestamp_utc": "2026-06-02 07:17:02+0000",
+      "test_case_id": 1146,
+      "test_case_type": "string_analysis",
+      "question": "Using the cryptographic entropy validation string associated with Configuration ID A7B9-STRING-2024-01, calculate the absolute difference between the total occurrences of the character 'F' and the character '3' in the complete hexadecimal sequence.",
+      "ground_truth": "1"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+        "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date.",
+          "filename": "hubs.txt",
+          "depth_percent": 29.507494646680943
+        },
+        {
+          "needle": "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+          "filename": "laundry.txt",
+          "depth_percent": 81.48670072221243
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.990372896194458,
+      "test_timestamp_utc": "2026-06-02 07:17:04+0000",
+      "test_case_id": 15,
+      "test_case_type": "date_time",
+      "question": "Based on the Project Quantum Phoenix (QPX-8812) timeline, what day of the week will the final deployment and network synchronization occur?",
+      "ground_truth": "Tuesday"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+        "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+          "filename": "apple.txt",
+          "depth_percent": 33.59916782246879
+        },
+        {
+          "needle": "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date.",
+          "filename": "submarine.txt",
+          "depth_percent": 37.82722513089005
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.9448225498199463,
+      "test_timestamp_utc": "2026-06-02 07:17:08+0000",
+      "test_case_id": 15,
+      "test_case_type": "date_time",
+      "question": "Based on the Project Quantum Phoenix (QPX-8812) timeline, what day of the week will the final deployment and network synchronization occur?",
+      "ground_truth": "Tuesday"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+        "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The QPX-8812 initiative, led by Dr. Aris Thorne at the Galileo Station, will synchronize all deep space transmitters on this critical date.",
+          "filename": "know.txt",
+          "depth_percent": 21.034077555816687
+        },
+        {
+          "needle": "Project Quantum Phoenix (QPX-8812) has its final deployment scheduled for 2030-11-12, marking the completion of the decade-long interstellar communication network.",
+          "filename": "vb.txt",
+          "depth_percent": 62.38532110091744
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The provided context does not contain a Project Quantum Phoenix (QPX-8812) timeline. I cannot answer the question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7751157283782959,
+      "test_timestamp_utc": "2026-06-02 07:17:09+0000",
+      "test_case_id": 15,
+      "test_case_type": "date_time",
+      "question": "Based on the Project Quantum Phoenix (QPX-8812) timeline, what day of the week will the final deployment and network synchronization occur?",
+      "ground_truth": "Tuesday"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+        "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+          "filename": "island.txt",
+          "depth_percent": 52.769385699899296
+        },
+        {
+          "needle": "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449.",
+          "filename": "laundry.txt",
+          "depth_percent": 86.01373965122424
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "A symbol type",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.3535740375518799,
+      "test_timestamp_utc": "2026-06-02 07:17:10+0000",
+      "test_case_id": 1245,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted a secure communication with ID TITAN_310_MSG_001. The field agent's status is embedded in a hex-encoded string mentioned in the protocol. Using the encoding standard from Operation Silent Hammer, what is the agent's clear-text status code?",
+      "ground_truth": "TITAN310"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+        "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449.",
+          "filename": "goodtaste.txt",
+          "depth_percent": 65.40385989992852
+        },
+        {
+          "needle": "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+          "filename": "vcsqueeze.txt",
+          "depth_percent": 57.54082612872238
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "INITIATE",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.31397390365600586,
+      "test_timestamp_utc": "2026-06-02 07:17:10+0000",
+      "test_case_id": 1245,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted a secure communication with ID TITAN_310_MSG_001. The field agent's status is embedded in a hex-encoded string mentioned in the protocol. Using the encoding standard from Operation Silent Hammer, what is the agent's clear-text status code?",
+      "ground_truth": "TITAN310"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+        "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Message ID: TITAN_310_MSG_001. Secure channel requires hex parsing of 544954414E333130 for asset verification.",
+          "filename": "unions.txt",
+          "depth_percent": 38.109756097560975
+        },
+        {
+          "needle": "In accordance with Operation Silent Hammer, all field agent status codes must be converted from hex to ASCII. Confirmation string begins with 5449.",
+          "filename": "vb.txt",
+          "depth_percent": 80.18348623853211
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "A2R",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.6186397075653076,
+      "test_timestamp_utc": "2026-06-02 07:17:11+0000",
+      "test_case_id": 1245,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted a secure communication with ID TITAN_310_MSG_001. The field agent's status is embedded in a hex-encoded string mentioned in the protocol. Using the encoding standard from Operation Silent Hammer, what is the agent's clear-text status code?",
+      "ground_truth": "TITAN310"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'.",
+          "filename": "aord.txt",
+          "depth_percent": 92.11873080859775
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The context does not mention the Artemis Foundation, project 'Nova-Seraph-7', 'Quantum Bloom Initiative', or any specific day of the week for such an activation",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.0377085208892822,
+      "test_timestamp_utc": "2026-06-02 07:17:13+0000",
+      "test_case_id": 126,
+      "test_case_type": "date_time",
+      "question": "According to the Artemis Foundation's timeline for project 'Nova-Seraph-7', what day of the week will the Quantum Bloom Initiative's primary activation occur?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'.",
+          "filename": "mod.txt",
+          "depth_percent": 41.32420091324201
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The context does not mention the Artemis Foundation, project 'Nova-Seraph-7', or the Quantum Bloom Initiative",
+      "agent_trace": {},
+      "score": 10,
+      "test_duration_seconds": 0.7119090557098389,
+      "test_timestamp_utc": "2026-06-02 07:17:14+0000",
+      "test_case_id": 126,
+      "test_case_type": "date_time",
+      "question": "According to the Artemis Foundation's timeline for project 'Nova-Seraph-7', what day of the week will the Quantum Bloom Initiative's primary activation occur?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Artemis Foundation has officially scheduled the Quantum Bloom Initiative's primary activation for 2054-4-8. The project code for this phase is 'Nova-Seraph-7'.",
+          "filename": "web20.txt",
+          "depth_percent": 38.910675381263616
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The provided context does not contain information about the Artemis Foundation, project 'Nova-Seraph-7', or the Quantum Bloom Initiative",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.1804213523864746,
+      "test_timestamp_utc": "2026-06-02 07:17:15+0000",
+      "test_case_id": 126,
+      "test_case_type": "date_time",
+      "question": "According to the Artemis Foundation's timeline for project 'Nova-Seraph-7', what day of the week will the Quantum Bloom Initiative's primary activation occur?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3.",
+          "filename": "popular.txt",
+          "depth_percent": 0.0
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question. The provided context does not contain any information about an experimental quantum-resistant protocol payload, identifier TAC-RD-2024-EXPERIMENT-ALPHA-001, or MD5 hash digests",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.243224859237671,
+      "test_timestamp_utc": "2026-06-02 07:17:17+0000",
+      "test_case_id": 994,
+      "test_case_type": "string_analysis",
+      "question": "For the experimental quantum-resistant protocol payload identified by TAC-RD-2024-EXPERIMENT-ALPHA-001, calculate the first 8 hexadecimal characters of its MD5 hash digest.",
+      "ground_truth": "82fa3906"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3.",
+          "filename": "unions.txt",
+          "depth_percent": 84.7560975609756
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "0e2b6e3a",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.4301755428314209,
+      "test_timestamp_utc": "2026-06-02 07:17:18+0000",
+      "test_case_id": 994,
+      "test_case_type": "string_analysis",
+      "question": "For the experimental quantum-resistant protocol payload identified by TAC-RD-2024-EXPERIMENT-ALPHA-001, calculate the first 8 hexadecimal characters of its MD5 hash digest.",
+      "ground_truth": "82fa3906"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Analysis Target String [RefID: TAC-RD-2024-EXPERIMENT-ALPHA-001]\n\nEncoded Protocol Payload: 0Afad7d7aA83F0aB655bFc8c9dC8bed33cbb3ce1af6f16c843c5b8CEcd03BED2A19F9054cEd923A04f457d3C5137d6ac0E6132Fd1FBe4aa1Dcb11Bbce50755af9cb8cF6f4A1fF1E9698849a2718ED64235ED5e80C0Cd1dAbE\n\nThis payload was captured during quantum-resistant encryption protocol validation phase 3.",
+          "filename": "vw.txt",
+          "depth_percent": 83.66124893071
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.4301021099090576,
+      "test_timestamp_utc": "2026-06-02 07:17:20+0000",
+      "test_case_id": 994,
+      "test_case_type": "string_analysis",
+      "question": "For the experimental quantum-resistant protocol payload identified by TAC-RD-2024-EXPERIMENT-ALPHA-001, calculate the first 8 hexadecimal characters of its MD5 hash digest.",
+      "ground_truth": "82fa3906"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME.",
+          "filename": "unions.txt",
+          "depth_percent": 50.609756097560975
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.1160740852355957,
+      "test_timestamp_utc": "2026-06-02 07:17:21+0000",
+      "test_case_id": 868,
+      "test_case_type": "string_analysis",
+      "question": "Using the QEKEP-v3.2 verification hash from the quantum key exchange between satellite QSAT-7 and ground station ALPHA-PRIME, calculate the sum of all numeric digits present in the hash value.",
+      "ground_truth": "301"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME.",
+          "filename": "rootsoflisp.txt",
+          "depth_percent": 50.21739130434783
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "32",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.43016815185546875,
+      "test_timestamp_utc": "2026-06-02 07:17:22+0000",
+      "test_case_id": 868,
+      "test_case_type": "string_analysis",
+      "question": "Using the QEKEP-v3.2 verification hash from the quantum key exchange between satellite QSAT-7 and ground station ALPHA-PRIME, calculate the sum of all numeric digits present in the hash value.",
+      "ground_truth": "301"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The verification hash for the quantum encryption key exchange protocol (QEKEP-v3.2) is: 2933a0A60FC77e4d1Ad1FD9baEcAAD95860E4BfF9DF1b20D8DFdF5C8CBB4FEdAbE0eaF259D4CacD9b83FAEbCC3d65Ccaf5Fe54e401c2aE39Cc9E7b551C9Bbc4C1c49dD207B8f2161ac7Fb30fd2. This hash serves as the primary integrity check for the quantum key distribution session between satellite QSAT-7 and ground station ALPHA-PRIME.",
+          "filename": "know.txt",
+          "depth_percent": 30.19976498237368
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "8",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.2790400981903076,
+      "test_timestamp_utc": "2026-06-02 07:17:23+0000",
+      "test_case_id": 868,
+      "test_case_type": "string_analysis",
+      "question": "Using the QEKEP-v3.2 verification hash from the quantum key exchange between satellite QSAT-7 and ground station ALPHA-PRIME, calculate the sum of all numeric digits present in the hash value.",
+      "ground_truth": "301"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+        "The master key for serial #GLOBAL-ALPHA is: 8087310293916676"
+      ],
+      "needle_locations": [
+        {
+          "needle": "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+          "filename": "apple.txt",
+          "depth_percent": 96.22052704576977
+        },
+        {
+          "needle": "The master key for serial #GLOBAL-ALPHA is: 8087310293916676",
+          "filename": "newideas.txt",
+          "depth_percent": 87.97250859106529
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot determine the access code from the given context. The context does not contain any information about a master key with serial #GLOBAL-ALPHA or an 8-digit access code",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.4826362133026123,
+      "test_timestamp_utc": "2026-06-02 07:17:24+0000",
+      "test_case_id": 745,
+      "test_case_type": "computation",
+      "question": "To unlock the central data archive, you must calculate the 8-digit access code derived from the master key with serial #GLOBAL-ALPHA. What is the final code?",
+      "ground_truth": "89929474"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+        "The master key for serial #GLOBAL-ALPHA is: 8087310293916676"
+      ],
+      "needle_locations": [
+        {
+          "needle": "The master key for serial #GLOBAL-ALPHA is: 8087310293916676",
+          "filename": "goodtaste.txt",
+          "depth_percent": 39.09935668334525
+        },
+        {
+          "needle": "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+          "filename": "pow.txt",
+          "depth_percent": 28.387096774193548
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot find any master key with serial #GLOBAL-ALPHA or an 8-digit access code in the provided context",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7497456073760986,
+      "test_timestamp_utc": "2026-06-02 07:17:25+0000",
+      "test_case_id": 745,
+      "test_case_type": "computation",
+      "question": "To unlock the central data archive, you must calculate the 8-digit access code derived from the master key with serial #GLOBAL-ALPHA. What is the final code?",
+      "ground_truth": "89929474"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+        "The master key for serial #GLOBAL-ALPHA is: 8087310293916676"
+      ],
+      "needle_locations": [
+        {
+          "needle": "The security vault requires a unique 8-digit access code, which is the integer part of the square root of the master key. The master key is identified by the serial number #GLOBAL-ALPHA.",
+          "filename": "iflisp.txt",
+          "depth_percent": 7.017543859649122
+        },
+        {
+          "needle": "The master key for serial #GLOBAL-ALPHA is: 8087310293916676",
+          "filename": "wisdom.txt",
+          "depth_percent": 67.2632213955359
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I don't have enough information to calculate an 8-digit access code",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.6387319564819336,
+      "test_timestamp_utc": "2026-06-02 07:17:31+0000",
+      "test_case_id": 745,
+      "test_case_type": "computation",
+      "question": "To unlock the central data archive, you must calculate the 8-digit access code derived from the master key with serial #GLOBAL-ALPHA. What is the final code?",
+      "ground_truth": "89929474"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake.",
+          "filename": "want.txt",
+          "depth_percent": 40.34003091190108
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "8d6e8f4d",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.4194624423980713,
+      "test_timestamp_utc": "2026-06-02 07:17:32+0000",
+      "test_case_id": 922,
+      "test_case_type": "string_analysis",
+      "question": "For the secure transaction authorization code identified as TXN-ALPHA-7B, calculate the first 8 characters of its MD5 hash.",
+      "ground_truth": "3f8446b6"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake.",
+          "filename": "sun.txt",
+          "depth_percent": 26.804123711340207
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot fulfill this request",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.8046243190765381,
+      "test_timestamp_utc": "2026-06-02 07:17:33+0000",
+      "test_case_id": 922,
+      "test_case_type": "string_analysis",
+      "question": "For the secure transaction authorization code identified as TXN-ALPHA-7B, calculate the first 8 characters of its MD5 hash.",
+      "ground_truth": "3f8446b6"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The secure transaction authorization code for the 'Project Chimera' prototype, with unique identifier TXN-ALPHA-7B, is: faC8Bc2C646A8fA6a674AA83019EAdcCf4aF1F6Fb7c179c7E4373D4299c5C05b102C93ed6bbDBea2EBAfbf4edB66aBd7fECBAcdAAD7Bd5df38F90c32Fb74a4E0feDF2. This code is used for the initial system handshake.",
+          "filename": "foundervisa.txt",
+          "depth_percent": 81.72484599589322
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot find any information about a \"TXN-ALPHA-7B\" transaction authorization code in the given context",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.543837070465088,
+      "test_timestamp_utc": "2026-06-02 07:17:35+0000",
+      "test_case_id": 922,
+      "test_case_type": "string_analysis",
+      "question": "For the secure transaction authorization code identified as TXN-ALPHA-7B, calculate the first 8 characters of its MD5 hash.",
+      "ground_truth": "3f8446b6"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+        "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+        "Multiplier Code: 269 - The dimensional resonance factor",
+        "Divisor Constant: 13 - The harmonic stabilization quotient"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+          "filename": "ecw.txt",
+          "depth_percent": 27.8059377262853
+        },
+        {
+          "needle": "Divisor Constant: 13 - The harmonic stabilization quotient",
+          "filename": "langdes.txt",
+          "depth_percent": 31.163287086446108
+        },
+        {
+          "needle": "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+          "filename": "rootsoflisp.txt",
+          "depth_percent": 4.130434782608695
+        },
+        {
+          "needle": "Multiplier Code: 269 - The dimensional resonance factor",
+          "filename": "sun.txt",
+          "depth_percent": 8.934707903780069
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot determine the final energy signature from the provided context, as it contains no numbers or values for the Foundation Stone, Activation Key, Multiplier Code, or Divisor Constant",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 4.497713565826416,
+      "test_timestamp_utc": "2026-06-02 07:17:40+0000",
+      "test_case_id": 774,
+      "test_case_type": "computation",
+      "question": "To activate the Chronos Gateway, engineers must calculate the precise energy signature. First, determine the number of active atoms by subtracting the Activation Key value from the Foundation Stone value. Then, amplify this result by the Multiplier Code. Finally, stabilize the energy field by dividing by the Divisor Constant (using integer division). What is the final energy signature required to open the gateway?",
+      "ground_truth": "130653056640149901"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+        "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+        "Multiplier Code: 269 - The dimensional resonance factor",
+        "Divisor Constant: 13 - The harmonic stabilization quotient"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Multiplier Code: 269 - The dimensional resonance factor",
+          "filename": "copy.txt",
+          "depth_percent": 77.44241461477363
+        },
+        {
+          "needle": "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+          "filename": "goodtaste.txt",
+          "depth_percent": 36.45461043602573
+        },
+        {
+          "needle": "Divisor Constant: 13 - The harmonic stabilization quotient",
+          "filename": "popular.txt",
+          "depth_percent": 18.81686595342983
+        },
+        {
+          "needle": "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+          "filename": "worked.txt",
+          "depth_percent": 16.58102089756766
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "269",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.24468088150024414,
+      "test_timestamp_utc": "2026-06-02 07:17:41+0000",
+      "test_case_id": 774,
+      "test_case_type": "computation",
+      "question": "To activate the Chronos Gateway, engineers must calculate the precise energy signature. First, determine the number of active atoms by subtracting the Activation Key value from the Foundation Stone value. Then, amplify this result by the Multiplier Code. Finally, stabilize the energy field by dividing by the Divisor Constant (using integer division). What is the final energy signature required to open the gateway?",
+      "ground_truth": "130653056640149901"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+        "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+        "Multiplier Code: 269 - The dimensional resonance factor",
+        "Divisor Constant: 13 - The harmonic stabilization quotient"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Foundation Stone: 9090016381474976 - The total number of atoms in the Quantum Crystal",
+          "filename": "bias.txt",
+          "depth_percent": 5.563282336578582
+        },
+        {
+          "needle": "Divisor Constant: 13 - The harmonic stabilization quotient",
+          "filename": "boss.txt",
+          "depth_percent": 46.95252679938744
+        },
+        {
+          "needle": "Multiplier Code: 269 - The dimensional resonance factor",
+          "filename": "nft.txt",
+          "depth_percent": 46.63461538461539
+        },
+        {
+          "needle": "Activation Key: 2775928142359925 - The number of inert atoms that must be subtracted",
+          "filename": "popular.txt",
+          "depth_percent": 8.391021606880637
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7853245735168457,
+      "test_timestamp_utc": "2026-06-02 07:17:43+0000",
+      "test_case_id": 774,
+      "test_case_type": "computation",
+      "question": "To activate the Chronos Gateway, engineers must calculate the precise energy signature. First, determine the number of active atoms by subtracting the Activation Key value from the Foundation Stone value. Then, amplify this result by the Multiplier Code. Finally, stabilize the energy field by dividing by the Divisor Constant (using integer division). What is the final energy signature required to open the gateway?",
+      "ground_truth": "130653056640149901"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+        "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission",
+          "filename": "avg.txt",
+          "depth_percent": 95.05625639277191
+        },
+        {
+          "needle": "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+          "filename": "love.txt",
+          "depth_percent": 63.778877887788774
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "ORION718",
+      "agent_trace": {},
+      "score": 10,
+      "test_duration_seconds": 0.3317725658416748,
+      "test_timestamp_utc": "2026-06-02 07:17:44+0000",
+      "test_case_id": 1405,
+      "test_case_type": "encoding",
+      "question": "Based on the intercepted communication protocol details, what is the original classified satellite designation that was hex-encoded as 4F52494F4E373138?",
+      "ground_truth": "ORION718"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+        "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission",
+          "filename": "before.txt",
+          "depth_percent": 10.912162162162161
+        },
+        {
+          "needle": "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+          "filename": "siliconvalley.txt",
+          "depth_percent": 89.48798328108673
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "ORION718",
+      "agent_trace": {},
+      "score": 10,
+      "test_duration_seconds": 0.2801828384399414,
+      "test_timestamp_utc": "2026-06-02 07:17:44+0000",
+      "test_case_id": 1405,
+      "test_case_type": "encoding",
+      "question": "Based on the intercepted communication protocol details, what is the original classified satellite designation that was hex-encoded as 4F52494F4E373138?",
+      "ground_truth": "ORION718"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+        "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission"
+      ],
+      "needle_locations": [
+        {
+          "needle": "The transmission contained a hex-encoded asset tag matching our satellite tracking protocol, showing 4F52494F4E373138 as the identifier",
+          "filename": "gh.txt",
+          "depth_percent": 86.27737226277372
+        },
+        {
+          "needle": "Our technical manual states that all classified satellite designations must be converted to hexadecimal using standard ASCII encoding before transmission",
+          "filename": "island.txt",
+          "depth_percent": 0.0
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "ORION718",
+      "agent_trace": {},
+      "score": 10,
+      "test_duration_seconds": 0.2918522357940674,
+      "test_timestamp_utc": "2026-06-02 07:17:45+0000",
+      "test_case_id": 1405,
+      "test_case_type": "encoding",
+      "question": "Based on the intercepted communication protocol details, what is the original classified satellite designation that was hex-encoded as 4F52494F4E373138?",
+      "ground_truth": "ORION718"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+        "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission.",
+          "filename": "langdes.txt",
+          "depth_percent": 12.806830309498398
+        },
+        {
+          "needle": "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+          "filename": "worked.txt",
+          "depth_percent": 4.887518556583305
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "January 2017",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.3409543037414551,
+      "test_timestamp_utc": "2026-06-02 07:17:46+0000",
+      "test_case_id": 1563,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted an encoded message with the unique identifier DragonFire-77. Using the clues from our intelligence files about the network's encoding practices and the captured text, what is the original, decoded content of this message? Provide only the decoded string.",
+      "ground_truth": "DRAGON399"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+        "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+          "filename": "apple.txt",
+          "depth_percent": 12.829403606102636
+        },
+        {
+          "needle": "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission.",
+          "filename": "gh.txt",
+          "depth_percent": 34.0
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "DragonFire-77",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.33090758323669434,
+      "test_timestamp_utc": "2026-06-02 07:17:46+0000",
+      "test_case_id": 1563,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted an encoded message with the unique identifier DragonFire-77. Using the clues from our intelligence files about the network's encoding practices and the captured text, what is the original, decoded content of this message? Provide only the decoded string.",
+      "ground_truth": "DRAGON399"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+        "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Our agent intercepted a secret message with ID 'DragonFire-77'. The message appears to follow a common cipher technique where words are mirrored to obscure their meaning. The captured text segment is: 993NOGARD",
+          "filename": "aord.txt",
+          "depth_percent": 75.99795291709314
+        },
+        {
+          "needle": "In our previous briefing, Agent Shadow mentioned that operatives in this network use simple transformation rules for quick encoding. They often reverse the entire string as their primary obfuscation method, keeping numbers in place relative to letters. This aligns with the pattern observed in the DragonFire-77 transmission.",
+          "filename": "island.txt",
+          "depth_percent": 83.18227593152065
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "DragonFire-77",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.3269791603088379,
+      "test_timestamp_utc": "2026-06-02 07:17:47+0000",
+      "test_case_id": 1563,
+      "test_case_type": "encoding",
+      "question": "Agent, we've intercepted an encoded message with the unique identifier DragonFire-77. Using the clues from our intelligence files about the network's encoding practices and the captured text, what is the original, decoded content of this message? Provide only the decoded string.",
+      "ground_truth": "DRAGON399"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+        "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)"
+      ],
+      "needle_locations": [
+        {
+          "needle": "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+          "filename": "apple.txt",
+          "depth_percent": 75.90152565880722
+        },
+        {
+          "needle": "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)",
+          "filename": "pow.txt",
+          "depth_percent": 69.03225806451613
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "3259",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.2802164554595947,
+      "test_timestamp_utc": "2026-06-02 07:17:53+0000",
+      "test_case_id": 440,
+      "test_case_type": "computation",
+      "question": "During the Galactic Resource Summit, Administrator Kael needs to determine the maximum number of aid packages each of the habitable exoplanets can receive, which is the integer square root of the total sentient life form count. Using the ID A4B7-C8D9-E0F1-G2H3 for the total population figure and ensuring no other numbers interfere, what is the precise allocation number per planet?",
+      "ground_truth": "32591708"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+        "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)"
+      ],
+      "needle_locations": [
+        {
+          "needle": "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)",
+          "filename": "unions.txt",
+          "depth_percent": 0.0
+        },
+        {
+          "needle": "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+          "filename": "useful.txt",
+          "depth_percent": 64.03247631935048
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "37",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.42514872550964355,
+      "test_timestamp_utc": "2026-06-02 07:17:54+0000",
+      "test_case_id": 440,
+      "test_case_type": "computation",
+      "question": "During the Galactic Resource Summit, Administrator Kael needs to determine the maximum number of aid packages each of the habitable exoplanets can receive, which is the integer square root of the total sentient life form count. Using the ID A4B7-C8D9-E0F1-G2H3 for the total population figure and ensuring no other numbers interfere, what is the precise allocation number per planet?",
+      "ground_truth": "32591708"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+        "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)"
+      ],
+      "needle_locations": [
+        {
+          "needle": "ID: X1Y2-Z3W4-V5U6-T7S8, Value: 32591708 (Planetary Registry: Habitable exoplanets requiring resource allocation)",
+          "filename": "newideas.txt",
+          "depth_percent": 0.0
+        },
+        {
+          "needle": "ID: A4B7-C8D9-E0F1-G2H3, Value: 1062219430357264 (Galactic Census: Total sentient life forms in Andromeda Sector Zeta-9)",
+          "filename": "vw.txt",
+          "depth_percent": 74.50812660393498
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question. The provided context discusses wealth, income inequality, and historical economic systems, but it contains no information about exoplanets, aid packages, sentient life form counts, or the ID A4B7-C8D9-E0F1-G2H3",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.306447982788086,
+      "test_timestamp_utc": "2026-06-02 07:17:55+0000",
+      "test_case_id": 440,
+      "test_case_type": "computation",
+      "question": "During the Galactic Resource Summit, Administrator Kael needs to determine the maximum number of aid packages each of the habitable exoplanets can receive, which is the integer square root of the total sentient life form count. Using the ID A4B7-C8D9-E0F1-G2H3 for the total population figure and ensuring no other numbers interfere, what is the precise allocation number per planet?",
+      "ground_truth": "32591708"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+        "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+          "filename": "aord.txt",
+          "depth_percent": 15.506653019447286
+        },
+        {
+          "needle": "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046.",
+          "filename": "submarine.txt",
+          "depth_percent": 56.96989528795812
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The provided context does not contain information about \"Project Chimera-X,\" \"Dr. Aris Thorne,\" \"Genesis Point initiative,\" or any related schedule",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.8413894176483154,
+      "test_timestamp_utc": "2026-06-02 07:17:56+0000",
+      "test_case_id": 118,
+      "test_case_type": "date_time",
+      "question": "Based on the schedule for Project Chimera-X's final temporal calibration under Dr. Aris Thorne, what day of the week will the Genesis Point initiative team need to be on standby?",
+      "ground_truth": "Thursday"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+        "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046."
+      ],
+      "needle_locations": [
+        {
+          "needle": "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+          "filename": "gba.txt",
+          "depth_percent": 75.635103926097
+        },
+        {
+          "needle": "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046.",
+          "filename": "vb.txt",
+          "depth_percent": 1.146788990825688
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer the question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.0530126094818115,
+      "test_timestamp_utc": "2026-06-02 07:17:58+0000",
+      "test_case_id": 118,
+      "test_case_type": "date_time",
+      "question": "Based on the schedule for Project Chimera-X's final temporal calibration under Dr. Aris Thorne, what day of the week will the Genesis Point initiative team need to be on standby?",
+      "ground_truth": "Thursday"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+        "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The success of this calibration is critical for the Genesis Point initiative's scheduled activation in early 2046.",
+          "filename": "before.txt",
+          "depth_percent": 10.912162162162161
+        },
+        {
+          "needle": "Project Chimera-X, under the directive of Dr. Aris Thorne, will conduct its final temporal calibration on October 26, 2045.",
+          "filename": "wisdom.txt",
+          "depth_percent": 48.099738588377235
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The context does not contain information about Project Chimera-X, Dr. Aris Thorne, or Genesis Point initiative",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.7032437324523926,
+      "test_timestamp_utc": "2026-06-02 07:17:58+0000",
+      "test_case_id": 118,
+      "test_case_type": "date_time",
+      "question": "Based on the schedule for Project Chimera-X's final temporal calibration under Dr. Aris Thorne, what day of the week will the Genesis Point initiative team need to be on standby?",
+      "ground_truth": "Thursday"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+        "Number of shipping containers per standard shipment batch: 5"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+          "filename": "ecw.txt",
+          "depth_percent": 78.20419985517741
+        },
+        {
+          "needle": "Number of shipping containers per standard shipment batch: 5",
+          "filename": "wisdom.txt",
+          "depth_percent": 36.7584958777398
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "0",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.2778339385986328,
+      "test_timestamp_utc": "2026-06-02 07:17:59+0000",
+      "test_case_id": 569,
+      "test_case_type": "computation",
+      "question": "In the 'Galactic Logistics' scenario, the warehouse 'Omega Prime' has a specific product with an inventory ID. Each standard shipment batch uses 5 shipping containers. To optimize storage, we need to calculate how many full batches can be shipped using all the product units. What is the maximum number of complete batches that can be prepared from the total product units identified by the inventory ID?",
+      "ground_truth": "519294262863793"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+        "Number of shipping containers per standard shipment batch: 5"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Number of shipping containers per standard shipment batch: 5",
+          "filename": "hubs.txt",
+          "depth_percent": 62.82655246252676
+        },
+        {
+          "needle": "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+          "filename": "startuplessons.txt",
+          "depth_percent": 49.59068010075567
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "3.6",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.3047475814819336,
+      "test_timestamp_utc": "2026-06-02 07:18:00+0000",
+      "test_case_id": 569,
+      "test_case_type": "computation",
+      "question": "In the 'Galactic Logistics' scenario, the warehouse 'Omega Prime' has a specific product with an inventory ID. Each standard shipment batch uses 5 shipping containers. To optimize storage, we need to calculate how many full batches can be shipped using all the product units. What is the maximum number of complete batches that can be prepared from the total product units identified by the inventory ID?",
+      "ground_truth": "519294262863793"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+        "Number of shipping containers per standard shipment batch: 5"
+      ],
+      "needle_locations": [
+        {
+          "needle": "Number of shipping containers per standard shipment batch: 5",
+          "filename": "founders.txt",
+          "depth_percent": 57.31370745170194
+        },
+        {
+          "needle": "Product inventory ID for warehouse 'Omega Prime': 2596471314318966",
+          "filename": "love.txt",
+          "depth_percent": 15.61056105610561
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.633148193359375,
+      "test_timestamp_utc": "2026-06-02 07:18:05+0000",
+      "test_case_id": 569,
+      "test_case_type": "computation",
+      "question": "In the 'Galactic Logistics' scenario, the warehouse 'Omega Prime' has a specific product with an inventory ID. Each standard shipment batch uses 5 shipping containers. To optimize storage, we need to calculate how many full batches can be shipped using all the product units. What is the maximum number of complete batches that can be prepared from the total product units identified by the inventory ID?",
+      "ground_truth": "519294262863793"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+        "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+          "filename": "langdes.txt",
+          "depth_percent": 13.713980789754535
+        },
+        {
+          "needle": "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition.",
+          "filename": "laundry.txt",
+          "depth_percent": 3.6991368680641186
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The context does not contain any details about 'Operation Hydra-Gamma-7X' or a pre-launch briefing day of the week",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.782646894454956,
+      "test_timestamp_utc": "2026-06-02 07:18:07+0000",
+      "test_case_id": 398,
+      "test_case_type": "date_time",
+      "question": "Based on the details for 'Operation Hydra-Gamma-7X', on what day of the week will the main pre-launch briefing take place?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+        "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+          "filename": "avg.txt",
+          "depth_percent": 1.1933174224343674
+        },
+        {
+          "needle": "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition.",
+          "filename": "before.txt",
+          "depth_percent": 83.3108108108108
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The provided context does not mention \"Operation Hydra-Gamma-7X\" or any pre-launch briefing",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.6411230564117432,
+      "test_timestamp_utc": "2026-06-02 07:18:07+0000",
+      "test_case_id": 398,
+      "test_case_type": "date_time",
+      "question": "Based on the details for 'Operation Hydra-Gamma-7X', on what day of the week will the main pre-launch briefing take place?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+        "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition."
+      ],
+      "needle_locations": [
+        {
+          "needle": "The Project Chimera launch sequence, designated 'Operation Hydra-Gamma-7X', is scheduled for 2036-9-3.",
+          "filename": "before.txt",
+          "depth_percent": 6.976351351351351
+        },
+        {
+          "needle": "All personnel are to report to the main hangar at 0800 hours for final briefing and system checks prior to ignition.",
+          "filename": "hubs.txt",
+          "depth_percent": 60.12847965738758
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "The context does not contain any information about 'Operation Hydra-Gamma-7X' or a pre-launch briefing",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.8868865966796875,
+      "test_timestamp_utc": "2026-06-02 07:18:09+0000",
+      "test_case_id": 398,
+      "test_case_type": "date_time",
+      "question": "Based on the details for 'Operation Hydra-Gamma-7X', on what day of the week will the main pre-launch briefing take place?",
+      "ground_truth": "Wednesday"
+    },
+    {
+      "test_number": 1,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+        "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+          "filename": "love.txt",
+          "depth_percent": 20.2970297029703
+        },
+        {
+          "needle": "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol.",
+          "filename": "todo.txt",
+          "depth_percent": 0.0
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I cannot answer this question as the context provided does not contain any information about an intercepted transmission, an encoding method, a specific protocol, or a payload with identifier TAG-A7B9C3",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.9730863571166992,
+      "test_timestamp_utc": "2026-06-02 07:18:21+0000",
+      "test_case_id": 1592,
+      "test_case_type": "encoding",
+      "question": "Using information from the intercepted transmission about the encoding method and the specific protocol mentioned, decode the payload with identifier TAG-A7B9C3 to reveal the original message.",
+      "ground_truth": "PHOENIX422"
+    },
+    {
+      "test_number": 2,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+        "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+          "filename": "addiction.txt",
+          "depth_percent": 73.81516587677726
+        },
+        {
+          "needle": "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol.",
+          "filename": "gap.txt",
+          "depth_percent": 98.6898430406019
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I don't know",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 0.4768838882446289,
+      "test_timestamp_utc": "2026-06-02 07:18:22+0000",
+      "test_case_id": 1592,
+      "test_case_type": "encoding",
+      "question": "Using information from the intercepted transmission about the encoding method and the specific protocol mentioned, decode the payload with identifier TAG-A7B9C3 to reveal the original message.",
+      "ground_truth": "PHOENIX422"
+    },
+    {
+      "test_number": 3,
+      "model": "ecnu-max",
+      "version": 1,
+      "needles": [
+        "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+        "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol."
+      ],
+      "needle_locations": [
+        {
+          "needle": "In the intercepted transmission, Agent Cerberus used the standard NATO phonetic alphabet encoding method where each letter is converted to its corresponding two-digit ASCII hex value. The captured payload with ID TAG-A7B9C3 contained: 50484F454E4958343232",
+          "filename": "addiction.txt",
+          "depth_percent": 96.44549763033176
+        },
+        {
+          "needle": "The tactical report mentions that all encoded communications from Operation Midnight Sun follow the hexadecimal representation pattern established in the 1983 Allied Signals Protocol.",
+          "filename": "goodtaste.txt",
+          "depth_percent": 95.56826304503217
+        }
+      ],
+      "total_files": 49,
+      "files_with_needles": 49,
+      "model_response": "I don't have the requested document in the provided context. The context is an essay about startup advice by Paul Graham, not containing any intercepted transmissions, encoding methods, protocols, or payloads with the identifier TAG-A7B9C3",
+      "agent_trace": {},
+      "score": 0,
+      "test_duration_seconds": 1.1596083641052246,
+      "test_timestamp_utc": "2026-06-02 07:18:23+0000",
+      "test_case_id": 1592,
+      "test_case_type": "encoding",
+      "question": "Using information from the intercepted transmission about the encoding method and the specific protocol mentioned, decode the payload with identifier TAG-A7B9C3 to reveal the original message.",
+      "ground_truth": "PHOENIX422"
+    }
+  ]
+}
