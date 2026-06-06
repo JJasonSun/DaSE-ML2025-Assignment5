@@ -232,6 +232,117 @@ DS_MODEL_NAME=deepseek-v4-pro
 基于评测结果推动 Agent 方案迭代，将 ToolAugmentedAgent 优化为“LLM 规划 + 确定性工具执行”架构；最新回归 mean score 达 8.00，验证工具增强与诊断闭环对精确任务稳定性的价值。
 ```
 
+### 2.8 Prompt 语言与编码策略
+
+早期曾讨论过 prompt 语言选择。用户一开始希望理解并优化项目 prompt，后来一度考虑把 prompt 改成中文。但项目在 Windows / PowerShell 环境下多次出现中文源码 mojibake，例如 `浣犳槸`、`锛`、`鈥` 等乱码，影响模型理解和代码可维护性。
+
+最终决策：
+
+- 发给模型的核心 prompt 尽量使用英文。
+- DeepSeek 报告分析 prompt 使用英文指令，但要求输出简体中文分析正文。
+- Python 源码中尽量避免直接写大段中文 prompt。
+- 文档和简历表述可以使用中文，但需要用 UTF-8 保存和查看。
+- 如果 PowerShell `Get-Content` 显示中文乱码，先用 UTF-8 方式读取确认，不要直接认定文件内容损坏。
+
+### 2.9 CLI、测试集和默认运行方式收敛
+
+用户希望项目更适合展示和复现，不要每次都手动指定大量参数。当前 CLI 已收敛为：
+
+- 默认测试集：`test_cases/test_cases_all_en.json`
+- 默认 `--test_mode multi`
+- 默认 `--num_samples 20`
+- 默认 `--num_tests 3`
+- 默认 `--evaluator_type llm`
+- 默认 `--generate_report True`
+- 默认 `--enable_thinking False`
+
+因此推荐主命令保持简洁：
+
+```bash
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent
+```
+
+快速冒烟：
+
+```bash
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --num_samples 5 --num_tests 1
+```
+
+扩大样本：
+
+```bash
+uv run python run.py --agent agents.tool_augmented_agent:ToolAugmentedAgent --num_samples 50
+```
+
+### 2.10 健康检查强制化
+
+用户曾希望删除健康检查开关，避免在模型、embedding 或 rerank 服务不可用时继续跑出误导性结果。
+
+当前决策：
+
+- 不保留 `--skip_model_test` 这类跳过健康检查的入口。
+- 评测前必须执行健康检查。
+- 健康检查覆盖主测模型、LLM judge、embedding 和 rerank。
+- 健康检查失败应先排查 `.env`、ECNU API、模型名和上游服务状态。
+
+这也是迁移到新电脑后优先跑冒烟测试的原因之一：先确认 API 和依赖都可用，再解释评测结果。
+
+### 2.11 报告形态：HTML 看板替代图片可视化
+
+项目早期有过 PNG 可视化 / `visualizations/` 之类的思路，用户后来明确希望：
+
+- 不生成图片。
+- 不引用图片。
+- 不让模型读图。
+- 评测结果直接生成 HTML 数据看板。
+- DeepSeek 只写分析文字，不负责生成 HTML 页面结构。
+
+当前实现边界：
+
+- `core/evaluation_data.py` 负责结构化数据和 metrics。
+- `reporters/deepseek_html_reporter.py` 负责 HTML 模板渲染和调用 DeepSeek 生成分析文字。
+- `generate_report.py` 支持基于本地 JSON 单独重生成 HTML。
+- DeepSeek 输出被要求为 Markdown 文本，报告插件会把它安全渲染进页面。
+
+这个设计是为了让报告稳定、可复现，也避免 LLM 直接生成 HTML 时格式漂移。
+
+### 2.12 Agent 收敛与旧入口清理
+
+用户认为原来 `agents/` 里 Agent 太多，不利于 AI 产品经理简历叙事。最终收敛为三层公开 Agent：
+
+- `BaselineAgent`
+- `HybridRetrievalAgent`
+- `ToolAugmentedAgent`
+
+旧 Agent / 旧入口不再作为公开推荐路径：
+
+- `ExampleAgent`
+- `SyncRetrievalAgent`
+- `AdvancedRetrievalAgent`
+- `ScenarioAwareAgent`
+- `agent_plus.py`
+- `agent_template.py`
+- `sync_agent.py`
+- `scenario_agent.py`
+
+当时明确不保留旧导入路径兼容 shim，因为项目当前目标是求职展示和架构清晰，而不是对外发布稳定 SDK。
+
+### 2.13 JD 对齐过程
+
+用户提供了 `docs/JD.md` 作为 AI 产品经理岗位参考。PowerShell 读取时显示过 mojibake，但能提取出的 JD 关键词包括：
+
+- AI 产品经理。
+- Vibe Coding。
+- Agent 场景评测与梳理。
+- 模型能力评估。
+- 数据驱动迭代。
+- Bad Case 分析。
+- AI Coding / 开发者工具。
+- MaaS / 商业化。
+- PRD、产品方案、用户研究、跨团队协作。
+
+因此本项目简历叙事从“我实现了一个评测框架”改为“我搭建了 Agent 能力评估和产品迭代闭环”。这是一次重要定位调整：降低算法工程味，增强 AI 产品经理岗位相关性。
+
 ## 3. 当前代码架构
 
 ### 3.1 公开 Agent 收敛
@@ -1052,7 +1163,44 @@ README 应包含：
 - 通过结构化报告进行 Bad Case 归因。
 - 用最新回归验证工具增强和诊断闭环价值。
 
-## 14. 当前最重要的上下文结论
+## 14. 记忆核对后的补充说明
+
+本节是和本地 Codex 记忆对照后补充的迁移提醒。它们不是新的需求，而是为了避免换电脑后丢掉一些容易被忽略的上下文。
+
+### 14.1 低成本验证命令
+
+除了单元测试和 5 样本冒烟，之前做过的低成本验证还包括：
+
+```bash
+uv run python -m compileall -q .
+uv run python run.py --help
+```
+
+`compileall` 用来确认 Python 文件没有语法错误；`run.py --help` 用来确认 CLI 参数面没有因为重构而损坏。
+
+### 14.2 ECNU API skill 的使用边界
+
+项目曾参考 `ecnu-api` skill 检查 ECNU OpenAI-compatible API 调用方式。迁移后如果继续排查 ECNU 模型、Embedding 或 Rerank 调用，应优先确认：
+
+- `core/ecnu_constants.py` 中模型名是否仍然正确。
+- `ECNU_BASE_URL` 是否仍为 `https://chat.ecnu.edu.cn/open/api/v1`。
+- 主测模型、评分模型、Embedding、Rerank 是否都能通过健康检查。
+- 不要在没有 API 文档要求时额外设置 `temperature`、`top_p`、`max_tokens`、`thinking_budget_tokens` 等参数；项目当前倾向尽可能使用服务端默认参数。
+
+### 14.3 指标使用边界
+
+记忆中可用于简历或项目说明的量化锚点是：
+
+- `ToolAugmentedAgent`：最新小样本回归 mean score `8.00`，范围是 `20 cases x 3 runs`。
+- `HybridRetrievalAgent`：最新大样本回归 mean score `2.06`，范围是 `100 cases x 3 runs`。
+
+这两个数字可以共同说明工具增强路线的价值，但不能写成严格同条件 A/B 对比。若要做严格对比，需要重新用相同样本量和相同运行次数跑 Tool 与 Hybrid。
+
+### 14.4 不属于本项目的记忆
+
+本地记忆中还包含 DeepCast、ecnu-api skill 开源发布、多模态 RAG 等其他项目的信息。它们只在“简历项目排序”和“项目叙事区分”中有参考价值，不应混入本项目的代码结构、评测指标或运行命令。
+
+## 15. 当前最重要的上下文结论
 
 - 项目核心方向已经清楚：AI Agent 评测与诊断，不是单纯 RAG Demo。
 - 公开 Agent 保持三层：Baseline、Hybrid、Tool。
@@ -1060,7 +1208,11 @@ README 应包含：
 - Tool 是主力，已经改成 planner-first。
 - 每个 Agent 都应维护自己的 `AGENT_PROFILE`。
 - 报告分析 prompt 会引用 Agent profile。
+- 核心模型 prompt 尽量保持英文，报告分析输出简体中文。
+- 评测前必须做健康检查，不建议恢复跳过健康检查开关。
+- 报告采用结构化 JSON + HTML 看板，不再走 PNG 图片可视化。
 - 每个 Agent 保留自己的 latest JSON 和 HTML report。
+- 默认 CLI 已收敛：`multi`、20 samples、3 runs、LLM judge、自动生成报告。
 - 最新 Tool 小样本回归 mean score 8.00。
 - 最新 Hybrid 大样本 mean score 2.06。
 - 单元测试当前 16 个通过。
